@@ -1,0 +1,283 @@
+<!doctype html>
+<html lang="uk">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+<meta name="theme-color" content="#1b1d2a">
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="apple-touch-icon" href="/icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>Ігри на двох</title>
+<style>
+:root{--bg:#1b1d2a;--card:#262a3d;--card2:#303552;--tx:#eef0ff;--mu:#9aa0c3;--ac:#7c6cff;--ok:#38d996;--bad:#ff5c7a;--p0:#4da3ff;--p1:#ff6fa5}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+body{margin:0;background:var(--bg);color:var(--tx);font:16px/1.4 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;min-height:100vh;padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom)}
+#app{max-width:560px;margin:0 auto;padding:14px}
+h1{margin:10px 0 18px;text-align:center}h3{margin:18px 0 8px}
+.card{background:var(--card);border-radius:16px;padding:14px;margin-bottom:12px}
+.muted{color:var(--mu);font-size:14px}
+input[type=text],input[type=number]{width:100%;padding:12px;border-radius:12px;border:2px solid var(--card2);background:var(--bg);color:var(--tx);font-size:17px}
+button{font:inherit;color:var(--tx);background:var(--card2);border:0;border-radius:12px;padding:12px 16px;cursor:pointer}
+button:disabled{opacity:.4;cursor:default}
+button.primary{background:var(--ac);font-weight:700;width:100%;margin-top:8px}
+button.ghost{background:transparent;padding:6px 10px;color:var(--mu)}
+.row{display:flex;gap:8px;align-items:center}.row>*{flex:1}.row>button{flex:none}
+.code{font-size:44px;font-weight:800;letter-spacing:8px;text-align:center;margin:4px 0}
+.dot{display:inline-block;width:10px;height:10px;border-radius:50%;background:var(--bad);margin-right:6px}.dot.on{background:var(--ok)}
+.games{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}
+.gbtn{text-align:left;padding:10px;border:2px solid transparent}.gbtn.on{border-color:var(--ac);background:#3a3f6b}
+.gbtn b{display:block}.gbtn span{font-size:13px;color:var(--mu)}
+.pun{display:flex;justify-content:space-between;align-items:center;background:var(--bg);padding:6px 6px 6px 12px;border-radius:10px;margin:4px 0}
+.pun button{padding:4px 10px}
+.wheelbox{position:relative;width:min(82vw,320px);margin:10px auto}
+.wheelbox canvas{width:100%;height:auto;display:block}
+.wheelbox:after{content:"";position:absolute;top:-6px;left:50%;margin-left:-14px;border:14px solid transparent;border-top:26px solid #fff;filter:drop-shadow(0 2px 2px #0008)}
+.big{font-size:22px;font-weight:800;text-align:center;margin:10px 0;min-height:30px}
+.bar{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:6px}
+.bar .pl{font-weight:700}.p0{color:var(--p0)}.p1{color:var(--p1)}
+.status{text-align:center;font-size:18px;font-weight:700;margin:8px 0}
+.badge{background:#4a3a1f;color:#ffd277;border-radius:10px;padding:6px 10px;text-align:center;margin:6px 0;font-size:14px}
+.banner{border-radius:16px;padding:14px;text-align:center;margin:10px 0}
+.banner.win{background:#154a36}.banner.lose{background:#4b1f2b}.banner.draw{background:var(--card2)}
+.banner h2{margin:0 0 6px}
+.grid{display:grid;gap:6px;margin:10px auto}.g3{grid-template-columns:repeat(3,1fr);max-width:330px}.g4{grid-template-columns:repeat(4,1fr);max-width:360px}
+.cell{aspect-ratio:1;font-size:clamp(28px,12vw,54px);padding:0;background:var(--card);border-radius:14px;font-weight:800}
+.cell.win{background:#2a5a45}.cell.x0{color:var(--p0)}.cell.x1{color:var(--p1)}
+.mem{font-size:clamp(24px,10vw,44px)}.mem.mo0{background:#24456b}.mem.mo1{background:#6b2a4a}
+.c4{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;background:#2459d6;padding:8px;border-radius:14px;max-width:420px;margin:10px auto}
+.disc{aspect-ratio:1;border-radius:50%;background:var(--bg);display:block;width:100%}
+.d0{background:#ff4d4d}.d1{background:#ffd23f}.rev .d0{background:#111;box-shadow:0 0 0 2px #555}.rev .d1{background:#f4f4f4}
+.disc.win{box-shadow:0 0 0 4px #fff}
+.rev{display:grid;grid-template-columns:repeat(8,1fr);gap:2px;background:#0b5d3a;padding:4px;border-radius:12px;max-width:420px;margin:10px auto}
+.rc{aspect-ratio:1;background:#12804f;display:flex;align-items:center;justify-content:center}
+.rc .disc{width:82%;height:82%;aspect-ratio:auto;border-radius:50%}.hint{width:28%;height:28%;border-radius:50%;background:#ffffff66;display:block}
+.rps{display:flex;justify-content:center;gap:10px;margin:14px 0}.rps button{font-size:46px;padding:14px 18px}
+.rps button.sel{outline:3px solid var(--ac)}
+.bsw{display:flex;flex-wrap:wrap;gap:12px;justify-content:center}
+.bsw>div{flex:1 1 250px;max-width:340px}.bsw h4{margin:4px 0;text-align:center;font-size:14px;color:var(--mu)}
+.bs{display:grid;grid-template-columns:repeat(10,1fr);gap:1px;background:#1d5a8a}
+.bc{aspect-ratio:1;background:#2a86c8;position:relative}
+.bc.ship{background:#8a96b8}.bc.miss:after{content:"";position:absolute;inset:35%;background:#fff;border-radius:50%}
+.bc.hit{background:#e0453a}.bc.hit:after{content:"✕";position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:12px;color:#fff}
+.bc.sunk{background:#6b1010}.bc.fire{cursor:crosshair}.bc.fire:active{background:#5fb0ea}
+.pile{display:flex;gap:8px;justify-content:center;margin:12px 0;min-height:46px;align-items:center}
+.stick{width:14px;height:46px;border-radius:7px;background:#e0b36a;cursor:pointer}.stick:hover{background:#ffd88a}
+.react{height:260px;border-radius:20px;display:flex;align-items:center;justify-content:center;text-align:center;font-size:26px;font-weight:800;margin:12px 0;user-select:none;padding:14px}
+.react.w{background:#7a2433}.react.g{background:#1f9d62}.react.r{background:var(--card2)}
+.dots{width:100%;max-width:420px;display:block;margin:10px auto}
+.ed.free{stroke:#3d4268;stroke-width:6;stroke-linecap:round}.ed.e0{stroke:var(--p0);stroke-width:7;stroke-linecap:round}.ed.e1{stroke:var(--p1);stroke-width:7;stroke-linecap:round}
+.hit{stroke:transparent;stroke-width:26;cursor:pointer}.bx.b0{fill:#4da3ff55}.bx.b1{fill:#ff6fa555}
+.log{background:var(--bg);border-radius:12px;padding:8px 12px;margin:10px 0;font-size:15px}.log div{margin:3px 0}
+#toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:#000c;padding:10px 16px;border-radius:12px;opacity:0;transition:.25s;pointer-events:none;z-index:9}
+#toast.on{opacity:1}#conn{position:fixed;top:6px;right:8px;font-size:12px;color:var(--bad)}
+label.chk{display:flex;gap:10px;align-items:center;padding:8px 0}label.chk input{width:22px;height:22px}
+</style>
+</head>
+<body>
+<div id="conn"></div>
+<div id="app"></div>
+<div id="toast"></div>
+<script>
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const GAMES = [
+  {id:'ttt',e:'❌',n:'Хрестики-нулики',d:'3 в ряд'},
+  {id:'c4',e:'🔴',n:'Чотири в ряд',d:'Кидай фішки'},
+  {id:'rev',e:'⚫',n:'Реверсі',d:'Захопи поле'},
+  {id:'bs',e:'🚢',n:'Морський бій',d:'Потопи флот'},
+  {id:'dots',e:'🔲',n:'Крапки й квадрати',d:'Замикай клітинки'},
+  {id:'mem',e:'🧠',n:'Пам’ять',d:'Знайди пари'},
+  {id:'rps',e:'✊',n:'Камінь-ножиці-папір',d:'До 2 перемог'},
+  {id:'nim',e:'🥢',n:'Нім',d:'Не бери останню'},
+  {id:'guess',e:'🔢',n:'Вгадай число',d:'Від 1 до 100'},
+  {id:'react',e:'⚡',n:'Дуель реакції',d:'До 3 перемог'},
+];
+const MARK = {ttt:['✕','○'],c4:['🔴','🟡'],rev:['⚫','⚪'],dots:['🟦','🟥']};
+const DEFAULT_PUNS = ['10 присідань','Заспівати уривок пісні','Розповісти жарт','Зробити комплімент переможцю','Танцювати 30 секунд','Масаж плечей 1 хвилину','Розповісти секрет','Принести переможцю напій'];
+
+let S = null, ws = null, runSeq = null, name = localStorage.name || '';
+let token = localStorage.token || (localStorage.token = Math.random().toString(36).slice(2) + Date.now().toString(36));
+
+// ---------- мережа ----------
+function connect() {
+  ws = new WebSocket((location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host);
+  ws.onopen = () => { $('#conn').textContent = ''; const c = localStorage.room; if (c && name) send({type:'join', code:c, name, token}); };
+  ws.onmessage = e => {
+    const m = JSON.parse(e.data);
+    if (m.type === 'room') { S = m; localStorage.room = m.code; render(); }
+    else if (m.type === 'error') { toast(m.msg); if (m.fatal) { localStorage.removeItem('room'); S = null; render(); } }
+  };
+  ws.onclose = () => { $('#conn').textContent = '⚠ немає зв’язку…'; setTimeout(connect, 1500); };
+}
+function send(o) { if (ws && ws.readyState === 1) ws.send(JSON.stringify(o)); else toast('Немає зв’язку із сервером'); }
+const mv = o => send({type:'move', ...o});
+const setS = o => send({type:'settings', ...o});
+function toast(t) { const e = $('#toast'); e.textContent = t; e.classList.add('on'); clearTimeout(toast.t); toast.t = setTimeout(() => e.classList.remove('on'), 2200); }
+
+// ---------- дії ----------
+function getName() { name = ($('#nm').value || '').trim() || 'Гравець'; localStorage.name = name; return name; }
+function create() { getName(); send({type:'create', name, token}); }
+function join() { getName(); const c = ($('#cd').value || '').trim().toUpperCase(); if (c.length < 4) return toast('Введіть код із 4 символів'); send({type:'join', code:c, name, token}); }
+function leave() { localStorage.removeItem('room'); send({type:'leave'}); S = null; render(); }
+function share() {
+  const url = location.origin + '/?r=' + S.code;
+  if (navigator.share) navigator.share({title:'Грати зі мною', text:'Заходь у гру, код ' + S.code, url}).catch(() => {});
+  else navigator.clipboard.writeText(url).then(() => toast('Посилання скопійовано'));
+}
+function addPun() { const v = ($('#np').value || '').trim(); if (!v) return; setS({puns:[...S.puns, v]}); }
+function delPun(i) { setS({puns:S.puns.filter((_, k) => k !== i)}); }
+function guessNum() { const n = parseInt($('#gn').value, 10); if (!(n >= 1 && n <= 100)) return toast('Число від 1 до 100'); mv({n}); }
+
+// ---------- колесо ----------
+function drawWheel(cv, items, rot) {
+  const n = items.length, s = 2 * Math.PI / n, R = cv.width / 2, x = cv.getContext('2d');
+  x.clearRect(0, 0, cv.width, cv.height); x.save(); x.translate(R, R); x.rotate(rot);
+  items.forEach((t, i) => {
+    x.beginPath(); x.moveTo(0, 0); x.arc(0, 0, R - 4, i * s - Math.PI / 2, (i + 1) * s - Math.PI / 2); x.closePath();
+    x.fillStyle = `hsl(${i * 360 / n},65%,48%)`; x.fill(); x.strokeStyle = '#fff6'; x.lineWidth = 2; x.stroke();
+    x.save(); x.rotate((i + .5) * s - Math.PI / 2); x.textAlign = 'right'; x.fillStyle = '#fff'; x.font = 'bold 17px system-ui,sans-serif';
+    x.fillText(t.length > 17 ? t.slice(0, 16) + '…' : t, R - 16, 6); x.restore();
+  });
+  x.restore();
+}
+function spin() {
+  const w = S.wheel; if (runSeq === w.seq) return; runSeq = w.seq;
+  const cv = $('#wheel'), s = 2 * Math.PI / S.puns.length;
+  const fin = 2 * Math.PI * w.turns - (w.target + .5) * s, t0 = performance.now(), D = 5200;
+  (function f(t) {
+    const k = Math.min(1, (t - t0) / D), e = 1 - Math.pow(1 - k, 4);
+    drawWheel(cv, S.puns, fin * e);
+    if (k < 1) requestAnimationFrame(f);
+    else $('#wres').innerHTML = '😈 ' + esc(S.punishment);
+  })(t0);
+}
+
+// ---------- рендери ігор ----------
+const opp = () => S.names[1 - S.you] || 'Суперник';
+const turnSt = t => S.phase === 'over' ? '' : t === S.you ? '🟢 Ваш хід' : '⏳ Хід: ' + esc(opp());
+const R = {};
+R.ttt = v => ({st: turnSt(v.turn), html: `<div class="grid g3">${v.b.map((x, i) => `<button class="cell x${x} ${v.line && v.line.includes(i) ? 'win' : ''}" data-m='{"i":${i}}'>${x === null ? '' : x === 0 ? '✕' : '○'}</button>`).join('')}</div>`});
+R.c4 = v => ({st: turnSt(v.turn), html: `<div class="c4">${v.b.map((row, r) => row.map((x, c) => `<span class="disc ${x === null ? '' : 'd' + x} ${v.line && v.line.some(l => l[0] === r && l[1] === c) ? 'win' : ''}" data-m='{"c":${c}}'></span>`).join('')).join('')}</div>`});
+R.rev = v => ({st: (turnSt(v.turn) + ' &nbsp; ' + (v.note ? '· ' + v.note : '')).trim(),
+  html: `<div class="muted" style="text-align:center">⚫ ${v.cnt[0]} — ⚪ ${v.cnt[1]}</div><div class="rev">${v.b.map((x, i) => `<div class="rc" data-m='{"i":${i}}'>${x === null ? (v.legal.includes(i) ? '<i class="hint"></i>' : '') : `<b class="disc d${x}"></b>`}</div>`).join('')}</div>`});
+R.rps = v => {
+  const E = ['✊', '✋', '✌️']; let info = '';
+  if (v.last) info = `Минулий раунд: ви ${E[v.last.c[S.you]]} проти ${E[v.last.c[1 - S.you]]} — ${v.last.w === 'draw' ? 'нічия' : v.last.w === S.you ? '✅ ви виграли' : '❌ суперник виграв'}`;
+  return {st: `Раунд ${v.round} · ${v.score[S.you]}:${v.score[1 - S.you]} ${v.mine !== null ? '· чекаємо суперника…' : v.oppDone ? '· суперник уже обрав!' : ''}`,
+    html: `<div class="rps">${E.map((e, i) => `<button class="${v.mine === i ? 'sel' : ''}" ${v.mine !== null ? 'disabled' : ''} data-m='{"c":${i}}'>${e}</button>`).join('')}</div><div class="muted" style="text-align:center">${info}</div>`};
+};
+R.mem = v => ({st: turnSt(v.turn) + ` · ${v.score[S.you]}:${v.score[1 - S.you]}`,
+  html: `<div class="grid g4">${v.cards.map((c, i) => `<button class="cell mem ${v.matched[i] !== -1 ? 'mo' + v.matched[i] : ''}" data-m='{"i":${i}}'>${c === null ? '❔' : c}</button>`).join('')}</div>`});
+R.bs = v => {
+  const own = v.own.map((x, i) => `<div class="bc ${x ? 'ship' : ''} ${v.inc[i] === 2 ? 'hit' : v.inc[i] === 1 ? 'miss' : ''}"></div>`).join('');
+  if (v.ph === 'place') return {st: v.ready[S.you] ? '⏳ Чекаємо суперника…' : 'Розставте кораблі',
+    html: `<div class="bs" style="max-width:340px;margin:10px auto">${own}</div>${v.ready[S.you] ? '' : `<div class="row"><button onclick="mv({a:'rand'})">🎲 Перемішати</button><button class="primary" style="margin:0" onclick="mv({a:'ready'})">✅ Готово</button></div>`}`};
+  const en = v.mine.map((x, i) => `<div class="bc ${x === 0 ? 'fire' : x === 1 ? 'miss' : x === 2 ? 'hit' : 'hit sunk'}" ${x === 0 ? `data-m='{"a":"fire","i":${i}}'` : ''}></div>`).join('');
+  return {st: turnSt(v.turn) + ` · кораблів: ${v.left[0]} / ${v.left[1]}`,
+    html: `<div class="bsw"><div><h4>Поле суперника (стріляйте)</h4><div class="bs">${en}</div></div><div><h4>Ваше поле</h4><div class="bs">${own}</div></div></div>`};
+};
+R.guess = v => {
+  let lo = 1, hi = 100; v.log.forEach(l => { if (l.r === '<') lo = Math.max(lo, l.n + 1); if (l.r === '>') hi = Math.min(hi, l.n - 1); });
+  const lines = v.log.slice(-8).reverse().map(l => `<div>${esc(S.names[l.p])}: <b>${l.n}</b> — ${l.r === '<' ? '⬆ більше' : l.r === '>' ? '⬇ менше' : '✅ вгадав!'}</div>`).join('');
+  return {st: turnSt(v.turn) + ` · число між ${lo} і ${hi}`,
+    html: `<div class="row"><input id="gn" type="number" min="1" max="100" inputmode="numeric" placeholder="1–100" onkeydown="if(event.key==='Enter')guessNum()"><button class="primary" style="margin:0" onclick="guessNum()" ${v.turn === S.you && S.phase === 'play' ? '' : 'disabled'}>Спробувати</button></div><div class="log">${lines || '<span class="muted">Ще немає спроб</span>'}</div>`};
+};
+R.react = v => {
+  let cls, txt;
+  if (v.phase === 'wait') { cls = 'w'; txt = 'Чекай… не тисни!'; }
+  else if (v.phase === 'go') { cls = 'g'; txt = 'ТИСНИ!'; }
+  else { cls = 'r'; const r = v.res; txt = r.w === S.you ? (r.ms != null ? `✅ Ви перші (${r.ms} мс)` : '✅ Суперник поспішив') : (r.ms != null ? `❌ Суперник швидший (${r.ms} мс)` : '❌ Ви поспішили'); }
+  return {st: `Раунд ${v.round} · ${v.score[S.you]}:${v.score[1 - S.you]} (до 3)`, html: `<div class="react ${cls}" data-fast data-m='{"c":1}'>${txt}</div>`};
+};
+R.nim = v => ({st: turnSt(v.turn), html: `<div class="muted" style="text-align:center">Торкніться палички — заберете її і всі праворуч. Хто візьме останню — програє.</div>` +
+  v.piles.map((n, j) => `<div class="pile">${n ? [...Array(n)].map((_, k) => `<span class="stick" data-m='{"p":${j},"n":${n - k}}'></span>`).join('') : '<em class="muted">—</em>'}</div>`).join('')});
+R.dots = v => {
+  const n = v.n, cs = 64, m = 24, W = n * cs + 2 * m, H = (n + 1) * n; let s = `<svg viewBox="0 0 ${W} ${W}" class="dots">`;
+  v.boxes.forEach((o, k) => { if (o !== null) s += `<rect x="${m + (k % n) * cs + 4}" y="${m + (k / n | 0) * cs + 4}" width="${cs - 8}" height="${cs - 8}" rx="8" class="bx b${o}"/>`; });
+  const ed = (x1, y1, x2, y2, e) => { const o = v.e[e]; return `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" class="ed ${o === null ? 'free' : 'e' + o}"/>` + (o === null ? `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" class="hit" data-m='{"e":${e}}'/>` : ''); };
+  for (let r = 0; r <= n; r++) for (let c = 0; c < n; c++) s += ed(m + c * cs, m + r * cs, m + (c + 1) * cs, m + r * cs, r * n + c);
+  for (let r = 0; r < n; r++) for (let c = 0; c <= n; c++) s += ed(m + c * cs, m + r * cs, m + c * cs, m + (r + 1) * cs, H + r * (n + 1) + c);
+  for (let r = 0; r <= n; r++) for (let c = 0; c <= n; c++) s += `<circle cx="${m + c * cs}" cy="${m + r * cs}" r="6" fill="#eef0ff"/>`;
+  return {st: turnSt(v.turn) + ` · клітинки ${v.score[S.you]}:${v.score[1 - S.you]}`, html: s + '</svg>'};
+};
+
+// ---------- екрани ----------
+function home() {
+  const q = new URLSearchParams(location.search).get('r') || '';
+  return `<h1>🎮 Ігри на двох</h1>
+  <div class="card"><input id="nm" type="text" maxlength="20" placeholder="Ваше ім’я" value="${esc(name)}">
+  <button class="primary" onclick="create()">➕ Створити кімнату</button></div>
+  <div class="card"><div class="muted" style="margin-bottom:8px">Або введіть код від друга</div>
+  <div class="row"><input id="cd" type="text" maxlength="4" placeholder="КОД" value="${esc(q.toUpperCase())}" style="text-transform:uppercase;letter-spacing:4px;text-align:center"><button onclick="join()">Увійти</button></div></div>`;
+}
+function playersHtml() {
+  return S.names.map((n, i) => `<div><span class="dot ${S.online[i] ? 'on' : ''}"></span><b class="p${i}">${n ? esc(n) : '— очікуємо гравця —'}</b>${i === S.you ? ' (ви)' : ''}</div>`).join('');
+}
+function lobby() {
+  const ready = S.online[0] && S.online[1];
+  return `<div class="bar"><b>Кімната</b><button class="ghost" onclick="leave()">Вийти ✕</button></div>
+  <div class="card"><div class="muted" style="text-align:center">Код кімнати</div><div class="code">${S.code}</div>
+  <button class="primary" style="margin:0 0 10px" onclick="share()">🔗 Запросити друга</button>${playersHtml()}</div>
+  <h3>Гра</h3><div class="games">${GAMES.map(g => `<button class="gbtn ${g.id === S.game ? 'on' : ''}" onclick="setS({game:'${g.id}'})"><b>${g.e} ${g.n}</b><span>${g.d}</span></button>`).join('')}</div>
+  <h3>Покарання</h3><div class="card">
+  <label class="chk"><input type="checkbox" ${S.withPun ? 'checked' : ''} onchange="setS({withPun:this.checked})"> З покаранням для того, хто програє</label>
+  ${S.withPun ? `<div class="muted">Перед грою колесо вибере покарання — його побачать обоє.</div>
+   ${S.puns.length >= 2 ? '<div class="wheelbox"><canvas id="wheel" width="640" height="640"></canvas></div>' : ''}
+   ${S.puns.map((p, i) => `<div class="pun"><span>${esc(p)}</span><button onclick="delPun(${i})">✕</button></div>`).join('')}
+   <div class="row" style="margin-top:8px"><input id="np" type="text" maxlength="60" placeholder="Нове покарання…" onkeydown="if(event.key==='Enter')addPun()"><button onclick="addPun()">＋</button></div>
+   <button class="ghost" onclick="setS({puns:DEFAULT_PUNS})">Скинути до стандартних</button>` : ''}</div>
+  <button class="primary" ${ready ? '' : 'disabled'} onclick="send({type:'start'})">${ready ? '▶ Почати гру' : 'Чекаємо другого гравця…'}</button>`;
+}
+function wheelScreen() {
+  return `<h1>🎡 Колесо покарань</h1><div class="muted" style="text-align:center">Покарання для того, хто програє:</div>
+  <div class="wheelbox"><canvas id="wheel" width="640" height="640"></canvas></div><div class="big" id="wres"></div>`;
+}
+function game() {
+  const g = GAMES.find(x => x.id === S.game), r = R[S.game](S.view), mk = MARK[S.game];
+  const tag = i => `<span class="p${i}">${mk ? mk[i] + ' ' : ''}${esc(S.names[i] || '?')}</span>`;
+  let ban = '';
+  if (S.phase === 'over') {
+    const w = S.winner, me = w === S.you;
+    const cls = w === 'draw' ? 'draw' : me ? 'win' : 'lose';
+    const title = w === 'draw' ? '🤝 Нічия!' : me ? '🏆 Ви перемогли!' : '😔 Ви програли';
+    const pun = S.withPun && S.punishment && w !== 'draw' ? `<div>😈 <b>${esc(S.names[1 - w])}</b> виконує: <b>${esc(S.punishment)}</b></div>` : '';
+    ban = `<div class="banner ${cls}"><h2>${title}</h2>${pun}<button class="primary" onclick="send({type:'again'})">🔁 Ще раз / інша гра</button></div>`;
+  }
+  return `<div class="bar"><b>${g.e} ${g.n}</b><button class="ghost" onclick="if(confirm('Вийти з кімнати?'))leave()">✕</button></div>
+  <div class="bar"><div class="pl">${tag(S.you)}</div><div class="pl">${tag(1 - S.you)}</div></div>
+  ${S.withPun && S.punishment ? `<div class="badge">😈 Програвший: ${esc(S.punishment)}</div>` : ''}
+  <div class="status">${r.st}</div><div id="board">${r.html}</div>${ban}`;
+}
+
+function render() {
+  const keep = {}; document.querySelectorAll('input[id]').forEach(i => keep[i.id] = i.value);
+  const act = document.activeElement && document.activeElement.id;
+  if (S && S.phase === 'wheel' && runSeq === S.wheel.seq) return;
+  let h;
+  if (!S) h = home();
+  else if (S.phase === 'lobby') h = lobby();
+  else if (S.phase === 'wheel') h = wheelScreen();
+  else h = game();
+  $('#app').innerHTML = h;
+  for (const id in keep) { const el = document.getElementById(id); if (el && (id === 'np' || id === 'gn' || id === 'dv')) { el.value = keep[id]; if (act === id) el.focus(); } }
+  if (S && S.phase === 'lobby' && S.withPun && S.puns.length >= 2) drawWheel($('#wheel'), S.puns, 0);
+  if (S && S.phase === 'wheel') spin();
+  if (S && S.phase === 'lobby') runSeq = null;
+}
+
+// кліки по ігрових елементах
+document.addEventListener('click', e => {
+  const el = e.target.closest('[data-m]:not([data-fast])');
+  if (el) mv(JSON.parse(el.getAttribute('data-m')));
+});
+document.addEventListener('pointerdown', e => {
+  const el = e.target.closest('[data-fast]');
+  if (el) mv(JSON.parse(el.getAttribute('data-m')));
+});
+
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(() => {});
+render(); connect();
+</script>
+<script src="/extra.js"></script>
+</body>
+</html>
