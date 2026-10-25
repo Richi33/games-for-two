@@ -7,9 +7,6 @@
 .sq.lt{background:#f0d9b5}.sq.dk{background:#a6713f}.sq.sel{background:#d6b84a}.sq.tg:after{content:"";position:absolute;width:30%;height:30%;border-radius:50%;background:#2ecc7199}
 .pc{width:80%;height:80%;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:clamp(14px,5vw,24px);color:#ffd23f;box-shadow:inset 0 -4px 0 #0004,0 2px 3px #0006}
 .pc.q0{background:#f4f4f4;color:#c28a00}.pc.q1{background:#b52b2b}
-.gm{display:grid;grid-template-columns:repeat(15,1fr);gap:1px;background:#8a6a3a;padding:2px;max-width:450px;margin:10px auto}
-.gc{aspect-ratio:1;background:#e3b96b;display:flex;align-items:center;justify-content:center}
-.stn{width:84%;height:84%;border-radius:50%;display:block}.stn.s0{background:#111}.stn.s1{background:#f4f4f4;box-shadow:0 0 0 1px #888}.stn.win{outline:3px solid #e0453a}.stn.last{outline:2px solid #2ecc71}
 .word{font-size:clamp(26px,9vw,40px);font-weight:800;letter-spacing:4px;text-align:center;margin:14px 0;word-break:break-word}
 .kb{display:flex;flex-wrap:wrap;gap:6px;justify-content:center;margin:10px 0}
 .kb button{width:clamp(34px,10.5vw,46px);padding:10px 0;font-weight:700}.kb button.ok{background:#1f7a52}.kb button.no{background:#7a2433}
@@ -22,7 +19,6 @@
 
   GAMES.push(
     { id: 'chk', e: '⚪', n: 'Шашки', d: 'Бий і стань дамкою' },
-    { id: 'gmk', e: '⚫', n: 'Гомоку', d: '5 в ряд на великому полі' },
     { id: 'hang', e: '🔤', n: 'Шибениця', d: 'Слова: вгадуйте літери' },
     { id: 'quiz', e: '❓', n: 'Вікторина', d: 'Ерудиція, 7 питань' },
     { id: 'math', e: '➗', n: 'Дуель рахунку', d: 'Хто швидше порахує' },
@@ -30,7 +26,7 @@
     { id: 'dice', e: '🎲', n: 'Кості-блеф', d: 'Обман і блеф' },
     { id: 'bj', e: '🃏', n: 'Двадцять одне', d: 'Очко: ближче до 21' },
   );
-  Object.assign(MARK, { chk: ['⚪', '🔴'], gmk: ['⚫', '⚪'] });
+  Object.assign(MARK, { chk: ['⚪', '🔴'] });
 
   // ----- Шашки -----
   let ckSel = null;
@@ -55,18 +51,13 @@
     };
   };
 
-  // ----- Гомоку -----
-  R.gmk = v => ({
-    st: turnSt(v.turn),
-    html: `<div class="gm">${v.b.map((x, i) => `<div class="gc" data-m='{"i":${i}}'>${x === null ? '' : `<b class="stn s${x} ${v.line && v.line.includes(i) ? 'win' : i === v.last ? 'last' : ''}"></b>`}</div>`).join('')}</div>`,
-  });
-
   // ----- Шибениця -----
   const UA = 'абвгґдеєжзиіїйклмнопрстуфхцчшщьюя';
+  const KB = { uk: UA, ru: 'абвгдежзийклмнопрстуфхцчшщъыьэюя' };
   R.hang = v => ({
     st: turnSt(v.turn) + ` · ❤️ ${v.lives[S.you]} / ${v.lives[1 - S.you]}`,
     html: `<div class="word">${v.mask.map(c => c ? c.toUpperCase() : '_').join(' ')}</div>${v.word ? `<div class="muted" style="text-align:center">Слово: <b>${esc(v.word)}</b></div>` : ''}
-      <div class="kb">${[...UA].map(l => { const g = v.g.find(x => x.l === l); return `<button class="${g ? (g.ok ? 'ok' : 'no') : ''}" ${g || S.phase !== 'play' ? 'disabled' : ''} data-m='{"l":"${l}"}'>${l.toUpperCase()}</button>`; }).join('')}</div>
+      <div class="kb">${[...(KB[v.lang] || UA)].map(l => { const g = v.g.find(x => x.l === l); return `<button class="${g ? (g.ok ? 'ok' : 'no') : ''}" ${g || S.phase !== 'play' ? 'disabled' : ''} data-m='{"l":"${l}"}'>${l.toUpperCase()}</button>`; }).join('')}</div>
       <div class="muted" style="text-align:center">Вгадали літеру — ходите ще раз. Схибили — втрачаєте життя й хід.</div>`,
   });
 
@@ -96,12 +87,12 @@
     const off = v.phase !== 'q' || v.locked ? 'disabled' : '';
     return {
       st: `Раунд ${v.round} · ${v.score[S.you]}:${v.score[1 - S.you]} (до 3)`,
-      html: `<div class="word">${esc(v.q)}</div><div class="muted" style="text-align:center">${hint}</div>
+      html: `<div class="word">${esc(v.q)}</div><div class="muted" style="text-align:center">${typeof hint === 'function' ? hint(v) : hint}</div>
         <div class="rowin"><input id="dv" data-ctx="${v.round}" type="text" autocomplete="off" autocapitalize="off" ${off} onkeydown="if(event.key==='Enter')duelSend()"><button class="primary" ${off} onclick="duelSend()">OK</button></div><div class="big">${info}</div>`,
     };
   };
   R.math = duel('Введіть результат. Помилка — до кінця раунду ви виходите.');
-  R.anag = duel('Складіть слово з цих літер (українською, маленькими).');
+  R.anag = duel(v => `Складіть слово з цих літер (${v.lang === 'ru' ? 'російською' : 'українською'}, маленькими).`);
 
   // ----- Кості-блеф -----
   const DF = ['⚀', '⚁', '⚂', '⚃', '⚄', '⚅'];

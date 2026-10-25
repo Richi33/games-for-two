@@ -9,6 +9,17 @@ const WORDS = ['кішка','собака','яблуко','груша','школ
 const WORDS_E = ['кіт','дім','ліс','сир','мак','дуб','сом','хліб','вовк','сніг','літо','зима','рука','гора','лампа','кава','мед','чай','вода','мова','ніж','вік','ключ','стіл'];
 const WORDS_H = ['велосипед','калькулятор','електричка','бібліотека','математика','телевізор','холодильник','фотографія','мандрівник','кінотеатр','університет','акваріум','електрика','календар','парашутист','космонавт','екскаватор','супермаркет'];
 
+const WORDS_RU = ['кошка','собака','яблоко','груша','школа','окно','фонарь','часы','зонтик','телефон','пляж','горы','река','озеро','лес','дорога','город','деревня','музыка','рисунок','книга','тетрадь','карандаш','футбол','шахматы','поезд','велосипед','ракета','космос','радуга','снежинка','шоколад','пельмени','подсолнух','арбуз','самокат','сапоги','подушка','ножницы','бабочка'];
+const WORDS_RU_E = ['кот','дом','лес','сыр','мак','дуб','сом','хлеб','волк','снег','лето','зима','рука','гора','лампа','чай','вода','язык','нож','ключ','стол','мир'];
+const WORDS_RU_H = ['велосипед','калькулятор','электричка','библиотека','математика','телевизор','холодильник','фотография','путешественник','кинотеатр','университет','аквариум','электричество','календарь','парашютист','космонавт','экскаватор','супермаркет'];
+const mid = a => a.filter(w => w.length >= 5 && w.length <= 8);
+const LISTS = {
+  uk: { easy: WORDS_E, normal: mid(WORDS), hard: WORDS_H, all: WORDS },
+  ru: { easy: WORDS_RU_E, normal: mid(WORDS_RU), hard: WORDS_RU_H, all: WORDS_RU },
+};
+const lang = o => (o && o.lang === 'ru' ? 'ru' : 'uk');
+const LETTER = { uk: /^[а-щьюяєіїґ]$/, ru: /^[а-я]$/ };
+
 // ---------- Шашки (8x8, обов'язкове взяття, прості дамки) ----------
 const inb = (r, c) => r >= 0 && r < 8 && c >= 0 && c < 8;
 const D4 = [[-1, -1], [-1, 1], [1, -1], [1, 1]];
@@ -65,42 +76,20 @@ const chk = {
   view: (s, p) => ({ b: s.b, turn: s.turn, must: s.must, legal: s.turn === p && s.winner == null ? ckLegal(s, p) : [] }),
 };
 
-// ---------- Гомоку (5 в ряд, 15x15) ----------
-const gmk = {
-  init: () => ({ b: Array(225).fill(null), turn: 0, winner: null, line: null, last: null }),
-  move(s, p, m) {
-    if (s.turn !== p) return ERR_TURN;
-    if (!isInt(m.i, 0, 224) || s.b[m.i] !== null) return { error: 'Клітинка зайнята' };
-    s.b[m.i] = p; s.last = m.i;
-    const r = (m.i / 15) | 0, c = m.i % 15;
-    for (const [dr, dc] of [[0, 1], [1, 0], [1, 1], [1, -1]]) {
-      const cells = [m.i];
-      for (const sg of [1, -1]) {
-        let rr = r + dr * sg, cc = c + dc * sg;
-        while (rr >= 0 && rr < 15 && cc >= 0 && cc < 15 && s.b[rr * 15 + cc] === p) { cells.push(rr * 15 + cc); rr += dr * sg; cc += dc * sg; }
-      }
-      if (cells.length >= 5) { s.winner = p; s.line = cells; return {}; }
-    }
-    if (s.b.every(x => x !== null)) s.winner = 'draw'; else s.turn = 1 - p;
-    return {};
-  },
-  view: s => ({ b: s.b, turn: s.turn, line: s.line, last: s.last }),
-};
-
 // ---------- Шибениця-дуель ----------
 const hang = {
-  init(o) { const d = (o && o.diff) || 'normal'; const list = d === 'easy' ? WORDS_E : d === 'hard' ? WORDS_H : WORDS.filter(w => w.length >= 5 && w.length <= 8); const n = { easy: 8, normal: 6, hard: 5 }[d] || 6; return { word: list[rnd(list.length)], g: [], lives: [n, n], turn: rnd(2), winner: null }; },
+  init(o) { const d = (o && o.diff) || 'normal', lg = lang(o); const list = LISTS[lg][d] || LISTS[lg].normal; const n = { easy: 8, normal: 6, hard: 5 }[d] || 6; return { word: list[rnd(list.length)], lang: lg, g: [], lives: [n, n], turn: rnd(2), winner: null }; },
   move(s, p, m) {
     if (s.turn !== p) return ERR_TURN;
     const l = String(m.l || '');
-    if (!/^[а-щьюяєіїґ]$/.test(l)) return { error: 'Оберіть літеру' };
+    if (!LETTER[s.lang].test(l)) return { error: 'Оберіть літеру' };
     if (s.g.some(x => x.l === l)) return { error: 'Ця літера вже була' };
     const ok = s.word.includes(l); s.g.push({ l, p, ok });
     if (ok) { if ([...s.word].every(ch => s.g.some(x => x.l === ch))) s.winner = p; }
     else { s.lives[p]--; if (s.lives[p] <= 0) s.winner = 1 - p; else s.turn = 1 - p; }
     return {};
   },
-  view: s => ({ mask: [...s.word].map(ch => s.g.some(x => x.l === ch) ? ch : null), g: s.g, lives: s.lives, turn: s.turn, word: s.winner != null ? s.word : null }),
+  view: s => ({ mask: [...s.word].map(ch => s.g.some(x => x.l === ch) ? ch : null), g: s.g, lives: s.lives, turn: s.turn, lang: s.lang, word: s.winner != null ? s.word : null }),
 };
 
 // ---------- Вікторина ----------
@@ -173,9 +162,9 @@ const quiz = {
 
 // ---------- Дуелі «хто швидше» (до 3 перемог): рахунок і анаграми ----------
 function makeDuel(gen) {
-  const nq = s => { const g = gen(); s.q = g.q; s.a = g.a; s.phase = 'q'; s.lock = [false, false]; s.res = null; };
+  const nq = s => { const g = gen(s.lang); s.q = g.q; s.a = g.a; s.phase = 'q'; s.lock = [false, false]; s.res = null; };
   return {
-    init() { const s = { score: [0, 0], round: 1, winner: null }; nq(s); return s; },
+    init(o) { const s = { score: [0, 0], round: 1, lang: lang(o), winner: null }; nq(s); return s; },
     move(s, p, m, sched) {
       if (s.phase !== 'q') return {};
       if (s.lock[p]) return { error: 'Ви вже помилились у цьому раунді' };
@@ -190,7 +179,7 @@ function makeDuel(gen) {
       else { s.lock[p] = true; if (s.lock[0] && s.lock[1]) done('none'); }
       return {};
     },
-    view: (s, p) => ({ q: s.q, score: s.score, round: s.round, phase: s.phase, res: s.res, a: s.phase === 'result' ? s.a : null, locked: s.lock[p] }),
+    view: (s, p) => ({ q: s.q, lang: s.lang, score: s.score, round: s.round, phase: s.phase, res: s.res, a: s.phase === 'result' ? s.a : null, locked: s.lock[p] }),
   };
 }
 const math = makeDuel(() => {
@@ -200,8 +189,8 @@ const math = makeDuel(() => {
   else { a = 3 + rnd(10); b = 3 + rnd(10); q = `${a} × ${b}`; r = a * b; }
   return { q, a: String(r) };
 });
-const anag = makeDuel(() => {
-  const w = WORDS[rnd(WORDS.length)]; let l = [...w], n = 0;
+const anag = makeDuel(lg => {
+  const list = LISTS[lg].all, w = list[rnd(list.length)]; let l = [...w], n = 0;
   do { shuffle(l); n++; } while (l.join('') === w && n < 20);
   return { q: l.join(' ').toUpperCase(), a: w };
 });
@@ -264,4 +253,4 @@ const bj = {
   },
 };
 
-module.exports = { chk, gmk, hang, quiz, math, anag, dice, bj };
+module.exports = { chk, hang, quiz, math, anag, dice, bj };

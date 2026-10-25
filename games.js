@@ -23,59 +23,6 @@ const ttt = {
   view: s => ({ b: s.b, turn: s.turn, line: s.line }),
 };
 
-// ---------- Чотири в ряд ----------
-const c4 = {
-  init: () => ({ b: Array.from({ length: 6 }, () => Array(7).fill(null)), turn: rnd(2), winner: null, line: null }),
-  move(s, p, m) {
-    if (s.turn !== p) return ERR_TURN;
-    if (!isInt(m.c, 0, 6)) return { error: 'Невірна колонка' };
-    let r = 5; while (r >= 0 && s.b[r][m.c] !== null) r--;
-    if (r < 0) return { error: 'Колонка заповнена' };
-    s.b[r][m.c] = p;
-    for (const [dr, dc] of [[0,1],[1,0],[1,1],[1,-1]]) {
-      const cells = [[r, m.c]];
-      for (const sg of [1, -1]) {
-        let rr = r + dr * sg, cc = m.c + dc * sg;
-        while (rr >= 0 && rr < 6 && cc >= 0 && cc < 7 && s.b[rr][cc] === p) { cells.push([rr, cc]); rr += dr * sg; cc += dc * sg; }
-      }
-      if (cells.length >= 4) { s.winner = p; s.line = cells; return {}; }
-    }
-    if (s.b[0].every(x => x !== null)) s.winner = 'draw'; else s.turn = 1 - p;
-    return {};
-  },
-  view: s => ({ b: s.b, turn: s.turn, line: s.line }),
-};
-
-// ---------- Реверсі ----------
-function flips(b, i, p) {
-  if (b[i] !== null) return [];
-  const r0 = i >> 3, c0 = i & 7, out = [];
-  for (let dr = -1; dr <= 1; dr++) for (let dc = -1; dc <= 1; dc++) {
-    if (!dr && !dc) continue;
-    let r = r0 + dr, c = c0 + dc; const t = [];
-    while (r >= 0 && r < 8 && c >= 0 && c < 8 && b[r * 8 + c] === 1 - p) { t.push(r * 8 + c); r += dr; c += dc; }
-    if (t.length && r >= 0 && r < 8 && c >= 0 && c < 8 && b[r * 8 + c] === p) out.push(...t);
-  }
-  return out;
-}
-const legal = (b, p) => { const o = []; for (let i = 0; i < 64; i++) if (flips(b, i, p).length) o.push(i); return o; };
-const count = b => [b.filter(x => x === 0).length, b.filter(x => x === 1).length];
-const rev = {
-  init() { const b = Array(64).fill(null); b[27] = 1; b[36] = 1; b[28] = 0; b[35] = 0; return { b, turn: 0, winner: null, note: '', last: null }; },
-  move(s, p, m) {
-    if (s.turn !== p) return ERR_TURN;
-    if (!isInt(m.i, 0, 63)) return { error: 'Невірна клітинка' };
-    const f = flips(s.b, m.i, p);
-    if (!f.length) return { error: 'Сюди ходити не можна' };
-    s.b[m.i] = p; f.forEach(k => s.b[k] = p); s.last = m.i; s.note = '';
-    if (legal(s.b, 1 - p).length) s.turn = 1 - p;
-    else if (legal(s.b, p).length) s.note = 'Суперник пропускає хід';
-    else { const [a, b2] = count(s.b); s.winner = a > b2 ? 0 : b2 > a ? 1 : 'draw'; }
-    return {};
-  },
-  view: (s, p) => ({ b: s.b, turn: s.turn, cnt: count(s.b), last: s.last, note: s.note, legal: s.turn === p && s.winner == null ? legal(s.b, p) : [] }),
-};
-
 // ---------- Камінь-ножиці-папір (до 2 перемог) ----------
 const rps = {
   init: () => ({ c: [null, null], score: [0, 0], round: 1, last: null, winner: null }),
@@ -225,6 +172,6 @@ const dots = {
   view: s => ({ n: N, e: s.e, boxes: s.boxes, turn: s.turn, score: s.score }),
 };
 
-module.exports = { ttt, c4, rev, rps, mem, bs, guess, react, nim, dots };
+module.exports = { ttt, rps, mem, bs, guess, react, nim, dots };
 Object.assign(module.exports, require('./games2'));
 Object.assign(module.exports, require('./games3'));
