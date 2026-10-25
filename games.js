@@ -99,18 +99,18 @@ const rps = {
 // ---------- Пам'ять ----------
 const EMO = ['🐶','🐱','🦊','🐼','🐸','🦁','🐙','🦄','🍕','🚀','🎈','🍩'];
 const mem = {
-  init() { const e = shuffle([...EMO]).slice(0, 8); return { cards: shuffle([...e, ...e]), matched: Array(16).fill(-1), open: [], turn: rnd(2), score: [0, 0], lock: false, winner: null }; },
+  init(o) { const L = { easy: [6, 1800], normal: [8, 1300], hard: [12, 800] }[o && o.diff] || [8, 1300]; const e = shuffle([...EMO]).slice(0, L[0]); return { cards: shuffle([...e, ...e]), matched: Array(L[0] * 2).fill(-1), open: [], turn: rnd(2), score: [0, 0], lock: false, delay: L[1], winner: null }; },
   move(s, p, m, sched) {
     if (s.turn !== p) return ERR_TURN;
     if (s.lock) return { error: 'Зачекайте' };
-    if (!isInt(m.i, 0, 15) || s.matched[m.i] !== -1 || s.open.includes(m.i)) return { error: 'Не можна' };
+    if (!isInt(m.i, 0, s.cards.length - 1) || s.matched[m.i] !== -1 || s.open.includes(m.i)) return { error: 'Не можна' };
     s.open.push(m.i);
     if (s.open.length === 2) {
       const [a, b] = s.open;
       if (s.cards[a] === s.cards[b]) {
         s.matched[a] = s.matched[b] = p; s.score[p]++; s.open = [];
         if (s.matched.every(x => x !== -1)) s.winner = s.score[0] > s.score[1] ? 0 : s.score[1] > s.score[0] ? 1 : 'draw';
-      } else { s.lock = true; sched(1300, () => { s.open = []; s.lock = false; s.turn = 1 - s.turn; }); }
+      } else { s.lock = true; sched(s.delay, () => { s.open = []; s.lock = false; s.turn = 1 - s.turn; }); }
     }
     return {};
   },
@@ -227,3 +227,4 @@ const dots = {
 
 module.exports = { ttt, c4, rev, rps, mem, bs, guess, react, nim, dots };
 Object.assign(module.exports, require('./games2'));
+Object.assign(module.exports, require('./games3'));
