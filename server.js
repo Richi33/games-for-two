@@ -3,6 +3,7 @@ const fs = require('fs');
 const path = require('path');
 const { WebSocketServer } = require('ws');
 const games = require('./games');
+const content = require('./content');
 
 const PORT = process.env.PORT || 3000;
 const STATIC = {
@@ -10,6 +11,7 @@ const STATIC = {
   '/index.html': ['index.html', 'text/html; charset=utf-8'],
   '/sw.js': ['sw.js', 'text/javascript'],
   '/extra.js': ['extra.js', 'text/javascript'],
+  '/extra2.js': ['extra2.js', 'text/javascript'],
   '/manifest.webmanifest': ['manifest.webmanifest', 'application/manifest+json'],
   '/icon-192.png': ['icon-192.png', 'image/png'],
   '/icon-512.png': ['icon-512.png', 'image/png'],
@@ -41,7 +43,7 @@ function snapshot(r, i) {
   return {
     type: 'room', code: r.code, you: i,
     names: r.players.map(p => p && p.name), online: r.players.map(p => !!(p && p.ws)),
-    game: r.game, withPun: r.withPun, puns: r.puns, phase: r.phase, wheel: r.wheel, punishment: r.punishment,
+    game: r.game, diff: r.diff, mode: r.mode, topic: r.topic, topics: r.phase === 'lobby' ? content.topicsFor(r.mode) : undefined, withPun: r.withPun, puns: r.puns, phase: r.phase, wheel: r.wheel, punishment: r.punishment,
     winner: r.state ? r.state.winner : null,
     view: playing ? games[r.game].view(r.state, i) : null,
   };
@@ -62,9 +64,24 @@ function check(r) { if (r.state && r.state.winner != null) r.phase = 'over'; }
 
 function begin(r) {
   const g = games[r.game];
-  r.state = g.init(); r.phase = 'play';
+  r.state = g.init({ diff: r.diff, mode: r.mode, topic: r.topic }); r.phase = 'play';
   if (g.start) g.start(r.state, sched(r));
   broadcast(r);
+}
+function startGame(r, ws) {
+  if (!r.players[0] || !r.players[1] || !r.players[0].ws || !r.players[1].ws) return send(ws, { type: 'error', msg: 'Потрібні двоє гравців онлайн' });
+  if (r.withPun && r.puns.length < 2) return send(ws, { type: 'error', msg: 'Додайте щонайменше 2 покарання' });
+  clearTimers(r);
+  if (r.withPun) {
+    const target = rnd(r.puns.length);
+    r.wheel = { target, turns: 5 + rnd(4), seq: Date.now() };
+    r.punishment = r.puns[target]; r.phase = 'wheel'; r.state = null;
+    const t = setTimeout(() => { r.timers.delete(t); if (r.phase === 'wheel') begin(r); }, 6800);
+    r.timers.add(t);
+    return broadcast(r);
+  }
+  r.wheel = null; r.punishment = null;
+  return begin(r);
 }
 function toLobby(r) { clearTimers(r); r.phase = 'lobby'; r.state = null; r.wheel = null; r.punishment = null; }
 
@@ -76,7 +93,7 @@ function cleanPuns(a) {
 function handle(ws, m) {
   if (m.type === 'create') {
     const code = newCode();
-    const r = { code, players: [null, null], game: 'ttt', withPun: false, puns: [...DEFAULT_PUNS], phase: 'lobby', state: null, wheel: null, punishment: null, timers: new Set() };
+    const r = { code, players: [null, null], game: 'ttt', diff: 'normal', mode: 'normal', topic: 'mix', withPun: false, puns: [...DEFAULT_PUNS], phase: 'lobby', state: null, wheel: null, punishment: null, timers: new Set() };
     rooms.set(code, r);
     ws.room = r; ws.idx = 0; ws.token = String(m.token || '');
     r.players[0] = { ws, name: String(m.name || 'Гравець').slice(0, 20), token: ws.token };
@@ -101,24 +118,19 @@ function handle(ws, m) {
   switch (m.type) {
     case 'settings':
       if (r.phase !== 'lobby') return;
-      if (games[m.game]) r.game = m.game;
+      if (typeof m.game === 'string' && Object.prototype.hasOwnProperty.call(games, m.game)) r.game = m.game;
+      if (['easy', 'normal', 'hard'].includes(m.diff)) r.diff = m.diff;
+      if (m.mode === 'normal' || m.mode === 'adult') { if (r.mode !== m.mode) r.topic = 'mix'; r.mode = m.mode; }
+      if (typeof m.topic === 'string' && (m.topic === 'mix' || content.topicsFor(r.mode).some(x => x.id === m.topic))) r.topic = m.topic;
       if (typeof m.withPun === 'boolean') r.withPun = m.withPun;
       if (m.puns) { const p = cleanPuns(m.puns); if (p) r.puns = p; }
       return broadcast(r);
     case 'start':
       if (r.phase !== 'lobby') return;
-      if (!r.players[0] || !r.players[1] || !r.players[0].ws || !r.players[1].ws) return send(ws, { type: 'error', msg: 'Потрібні двоє гравців онлайн' });
-      if (r.withPun) {
-        if (r.puns.length < 2) return send(ws, { type: 'error', msg: 'Додайте щонайменше 2 покарання' });
-        const target = rnd(r.puns.length);
-        r.wheel = { target, turns: 5 + rnd(4), seq: Date.now() };
-        r.punishment = r.puns[target]; r.phase = 'wheel';
-        const t = setTimeout(() => { r.timers.delete(t); if (r.phase === 'wheel') begin(r); }, 6800);
-        r.timers.add(t);
-        return broadcast(r);
-      }
-      r.punishment = null;
-      return begin(r);
+      return startGame(r, ws);
+    case 'restart':                      // «Почати заново» після гри: та сама гра й налаштування
+      if (r.phase !== 'over') return;
+      return startGame(r, ws);
     case 'move': {
       if (r.phase !== 'play') return;
       const res = games[r.game].move(r.state, i, m, sched(r));

@@ -97,7 +97,7 @@
     return {
       st: `Раунд ${v.round} · ${v.score[S.you]}:${v.score[1 - S.you]} (до 3)`,
       html: `<div class="word">${esc(v.q)}</div><div class="muted" style="text-align:center">${hint}</div>
-        <div class="row" style="margin-top:10px"><input id="dv" type="text" autocomplete="off" autocapitalize="off" ${off} onkeydown="if(event.key==='Enter')duelSend()"><button class="primary" style="margin:0" ${off} onclick="duelSend()">OK</button></div><div class="big">${info}</div>`,
+        <div class="rowin"><input id="dv" data-ctx="${v.round}" type="text" autocomplete="off" autocapitalize="off" ${off} onkeydown="if(event.key==='Enter')duelSend()"><button class="primary" ${off} onclick="duelSend()">OK</button></div><div class="big">${info}</div>`,
     };
   };
   R.math = duel('Введіть результат. Помилка — до кінця раунду ви виходите.');
