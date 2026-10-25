@@ -44,13 +44,6 @@ button.ghost{background:transparent;padding:6px 10px;color:var(--mu)}
 .cell{aspect-ratio:1;font-size:clamp(28px,12vw,54px);padding:0;background:var(--card);border-radius:14px;font-weight:800}
 .cell.win{background:#2a5a45}.cell.x0{color:var(--p0)}.cell.x1{color:var(--p1)}
 .mem{font-size:clamp(24px,10vw,44px)}.mem.mo0{background:#24456b}.mem.mo1{background:#6b2a4a}
-.c4{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;background:#2459d6;padding:8px;border-radius:14px;max-width:420px;margin:10px auto}
-.disc{aspect-ratio:1;border-radius:50%;background:var(--bg);display:block;width:100%}
-.d0{background:#ff4d4d}.d1{background:#ffd23f}.rev .d0{background:#111;box-shadow:0 0 0 2px #555}.rev .d1{background:#f4f4f4}
-.disc.win{box-shadow:0 0 0 4px #fff}
-.rev{display:grid;grid-template-columns:repeat(8,1fr);gap:2px;background:#0b5d3a;padding:4px;border-radius:12px;max-width:420px;margin:10px auto}
-.rc{aspect-ratio:1;background:#12804f;display:flex;align-items:center;justify-content:center}
-.rc .disc{width:82%;height:82%;aspect-ratio:auto;border-radius:50%}.hint{width:28%;height:28%;border-radius:50%;background:#ffffff66;display:block}
 .rps{display:flex;justify-content:center;gap:10px;margin:14px 0}.rps button{font-size:46px;padding:14px 18px}
 .rps button.sel{outline:3px solid var(--ac)}
 .bsw{display:flex;flex-wrap:wrap;gap:12px;justify-content:center}
@@ -80,6 +73,9 @@ label.chk{display:flex;gap:10px;align-items:center;padding:8px 0}label.chk input
 .modal{position:fixed;inset:0;background:#000a;display:flex;align-items:center;justify-content:center;z-index:50;padding:20px}
 .mbox{background:var(--card);border-radius:16px;padding:18px;max-width:340px;width:100%;text-align:center;font-size:18px}
 .mbox .row{margin-top:14px}.mbox button{flex:1;margin:0}
+.rules{margin:10px 0 14px;text-align:left;font-size:16px;line-height:1.45;font-weight:400}
+.rules-card{font-size:15px;line-height:1.45;margin-top:10px}
+.hbtns{display:flex;gap:2px}
 </style>
 </head>
 <body>
@@ -91,8 +87,6 @@ const $ = s => document.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const GAMES = [
   {id:'ttt',e:'❌',n:'Хрестики-нулики',d:'3 в ряд'},
-  {id:'c4',e:'🔴',n:'Чотири в ряд',d:'Кидай фішки'},
-  {id:'rev',e:'⚫',n:'Реверсі',d:'Захопи поле'},
   {id:'bs',e:'🚢',n:'Морський бій',d:'Потопи флот'},
   {id:'dots',e:'🔲',n:'Крапки й квадрати',d:'Замикай клітинки'},
   {id:'mem',e:'🧠',n:'Пам’ять',d:'Знайди пари'},
@@ -101,7 +95,7 @@ const GAMES = [
   {id:'guess',e:'🔢',n:'Вгадай число',d:'Від 1 до 100'},
   {id:'react',e:'⚡',n:'Дуель реакції',d:'До 3 перемог'},
 ];
-const MARK = {ttt:['✕','○'],c4:['🔴','🟡'],rev:['⚫','⚪'],dots:['🟦','🟥']};
+const MARK = {ttt:['✕','○'],dots:['🟦','🟥']};
 const DEFAULT_PUNS = ['10 присідань','Заспівати уривок пісні','Розповісти жарт','Зробити комплімент переможцю','Танцювати 30 секунд','Масаж плечей 1 хвилину','Розповісти секрет','Принести переможцю напій'];
 
 let S = null, ws = null, runSeq = null, name = localStorage.name || '';
@@ -114,6 +108,7 @@ function connect() {
   ws.onmessage = e => {
     const m = JSON.parse(e.data);
     if (m.type === 'room') { const prev = S; S = m; localStorage.room = m.code; if (m.phase === 'play' && prev && prev.phase !== 'play') playStart(); render(); }
+    else if (m.type === 'toast') toast(m.msg);
     else if (m.type === 'error') { toast(m.msg); if (m.fatal) { localStorage.removeItem('room'); S = null; render(); } }
   };
   ws.onclose = () => { $('#conn').textContent = '⚠ немає зв’язку…'; setTimeout(connect, 1500); };
@@ -146,12 +141,26 @@ document.addEventListener('pointerdown', audio, { once: true });
 function getName() { name = ($('#nm').value || '').trim() || 'Гравець'; localStorage.name = name; return name; }
 function create() { getName(); send({type:'create', name, token}); }
 function join() { getName(); const c = ($('#cd').value || '').trim().toUpperCase(); if (c.length < 4) return toast('Введіть код із 4 символів'); send({type:'join', code:c, name, token}); }
-function askLeave() {
+function openModal(inner, onAct) {
   if (document.querySelector('.modal')) return;
   const d = document.createElement('div'); d.className = 'modal';
-  d.innerHTML = '<div class="mbox">Вийти з кімнати?<div class="row"><button class="primary" id="mY">Вийти</button><button id="mN">Залишитись</button></div></div>';
-  d.addEventListener('click', e => { if (e.target === d || e.target.id === 'mN') d.remove(); else if (e.target.id === 'mY') { d.remove(); leave(); } });
+  d.innerHTML = '<div class="mbox">' + inner + '</div>';
+  d.addEventListener('click', e => {
+    const a = e.target.dataset && e.target.dataset.act;
+    if (e.target === d || (e.target.dataset && e.target.dataset.close)) d.remove();
+    else if (a && onAct) { d.remove(); onAct(a); }
+  });
   document.body.appendChild(d);
+}
+function askLeave() {
+  openModal('Вийти з кімнати?<div class="row"><button class="primary" data-act="y">Вийти</button><button data-close="1">Залишитись</button></div>', leave);
+}
+function askMenu() {
+  openModal('Повернутись у меню вибору гри? Поточну гру буде перервано для обох.<div class="row"><button class="primary" data-act="y">У меню</button><button data-close="1">Скасувати</button></div>', () => send({ type: 'menu' }));
+}
+function showRules() {
+  const g = GAMES.find(x => x.id === S.game); if (!g) return;
+  openModal('<b>' + g.e + ' ' + esc(g.n) + '</b><div class="rules">' + esc((window.RULES && RULES[S.game]) || 'Правила скоро з’являться.') + '</div><button class="primary" data-close="1">Зрозуміло</button>');
 }
 function leave() { localStorage.removeItem('room'); send({type:'leave'}); S = null; render(); }
 function share() {
@@ -182,13 +191,14 @@ function drawWheel(cv, items, rot) {
 }
 function spin() {
   const w = S.wheel; if (runSeq === w.seq) return; runSeq = w.seq;
-  const cv = $('#wheel'), s = 2 * Math.PI / S.puns.length;
+  const cv = $('#wheel'), puns = S.puns.slice(), pun = S.punishment, s = 2 * Math.PI / puns.length;
   const fin = 2 * Math.PI * w.turns - (w.target + .5) * s, t0 = performance.now(), D = 5200;
   (function f(t) {
+    if (!cv.isConnected) return;                       // пішли з екрана колеса — зупиняємо анімацію
     const k = Math.min(1, (t - t0) / D), e = 1 - Math.pow(1 - k, 4);
-    drawWheel(cv, S.puns, fin * e);
+    drawWheel(cv, puns, fin * e);
     if (k < 1) requestAnimationFrame(f);
-    else $('#wres').innerHTML = '😈 ' + esc(S.punishment);
+    else { const el = $('#wres'); if (el) el.innerHTML = '😈 ' + esc(pun); }
   })(t0);
 }
 
@@ -197,9 +207,6 @@ const opp = () => S.names[1 - S.you] || 'Суперник';
 const turnSt = t => S.phase === 'over' ? '' : t === S.you ? '🟢 Ваш хід' : '⏳ Хід: ' + esc(opp());
 const R = {};
 R.ttt = v => ({st: turnSt(v.turn), html: `<div class="grid g3">${v.b.map((x, i) => `<button class="cell x${x} ${v.line && v.line.includes(i) ? 'win' : ''}" data-m='{"i":${i}}'>${x === null ? '' : x === 0 ? '✕' : '○'}</button>`).join('')}</div>`});
-R.c4 = v => ({st: turnSt(v.turn), html: `<div class="c4">${v.b.map((row, r) => row.map((x, c) => `<span class="disc ${x === null ? '' : 'd' + x} ${v.line && v.line.some(l => l[0] === r && l[1] === c) ? 'win' : ''}" data-m='{"c":${c}}'></span>`).join('')).join('')}</div>`});
-R.rev = v => ({st: (turnSt(v.turn) + ' &nbsp; ' + (v.note ? '· ' + v.note : '')).trim(),
-  html: `<div class="muted" style="text-align:center">⚫ ${v.cnt[0]} — ⚪ ${v.cnt[1]}</div><div class="rev">${v.b.map((x, i) => `<div class="rc" data-m='{"i":${i}}'>${x === null ? (v.legal.includes(i) ? '<i class="hint"></i>' : '') : `<b class="disc d${x}"></b>`}</div>`).join('')}</div>`});
 R.rps = v => {
   const E = ['✊', '✋', '✌️']; let info = '';
   if (v.last) info = `Минулий раунд: ви ${E[v.last.c[S.you]]} проти ${E[v.last.c[1 - S.you]]} — ${v.last.w === 'draw' ? 'нічия' : v.last.w === S.you ? '✅ ви виграли' : '❌ суперник виграв'}`;
@@ -270,7 +277,7 @@ function lobby() {
   <button class="primary" ${ready ? '' : 'disabled'} onclick="send({type:'start'})">${ready ? '▶ Почати гру' : 'Чекаємо другого гравця…'}</button>`;
 }
 function wheelScreen() {
-  return `<div class="bar"><span></span><button class="ghost xbtn" onclick="askLeave()" aria-label="Вийти">✕</button></div><h1>🎡 Колесо покарань</h1><div class="muted" style="text-align:center">Покарання для того, хто програє:</div>
+  return `<div class="bar"><span></span><span class="hbtns"><button class="ghost xbtn" onclick="askMenu()" aria-label="В меню">🏠</button><button class="ghost xbtn" onclick="askLeave()" aria-label="Вийти">✕</button></span></div><h1>🎡 Колесо покарань</h1><div class="muted" style="text-align:center">Покарання для того, хто програє:</div>
   <div class="wheelbox"><canvas id="wheel" width="640" height="640"></canvas></div><div class="big" id="wres"></div>`;
 }
 function game() {
@@ -284,7 +291,7 @@ function game() {
     const pun = S.withPun && S.punishment && w !== 'draw' ? `<div>😈 <b>${esc(S.names[1 - w])}</b> виконує: <b>${esc(S.punishment)}</b></div>` : '';
     ban = `<div class="banner ${cls}"><h2>${title}</h2>${pun}<div class="endbtns"><button class="primary" onclick="send({type:'restart'})">🔁 Почати заново</button><button onclick="send({type:'again'})">🏠 В меню</button></div></div>`;
   }
-  return `<div class="bar"><b>${g.e} ${g.n}</b><button class="ghost xbtn" onclick="askLeave()" aria-label="Вийти">✕</button></div>
+  return `<div class="bar"><b>${g.e} ${g.n}</b><span class="hbtns"><button class="ghost xbtn" onclick="showRules()" aria-label="Правила">❓</button><button class="ghost xbtn" onclick="askMenu()" aria-label="В меню">🏠</button><button class="ghost xbtn" onclick="askLeave()" aria-label="Вийти">✕</button></span></div>
   <div class="bar"><div class="pl">${tag(S.you)}</div><div class="pl">${tag(1 - S.you)}</div></div>
   ${S.withPun && S.punishment ? `<div class="badge">😈 Програвший: ${esc(S.punishment)}</div>` : ''}
   <div class="status">${r.st}</div><div id="board">${r.html}</div>${ban}`;
@@ -320,6 +327,7 @@ if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').cat
 render(); connect();
 </script>
 <script src="/extra.js"></script>
+<script src="/rules.js"></script>
 <script src="/extra2.js"></script>
 </body>
 </html>

@@ -36,6 +36,12 @@
       h += `<div class="muted">Складність</div><div class="games" style="grid-template-columns:repeat(3,1fr)">`
         + [['easy', '🟢 Легко'], ['normal', '🟡 Звичайно'], ['hard', '🔴 Складно']].map(([k, l]) => btn(S.diff === k, `setS({diff:'${k}'})`, l, desc[k])).join('') + `</div>`;
     }
+    if (g === 'hang' || g === 'anag') {
+      h += `<div class="muted" style="margin-top:10px">Мова слів</div><div class="games">`
+        + btn(S.lang !== 'ru', `setS({lang:'uk'})`, '🇺🇦 Українська', 'Українські слова')
+        + btn(S.lang === 'ru', `setS({lang:'ru'})`, 'Російська', 'Русские слова')
+        + `</div>`;
+    }
     if (CONTENT.includes(g)) {
       h += `<div class="muted">Режим</div><div class="games">`
         + btn(S.mode === 'normal', `setS({mode:'normal'})`, '😊 Звичайний', 'Для всіх')
@@ -48,7 +54,8 @@
         + S.topics.map(t => `<button class="chip ${S.topic === t.id ? 'on' : ''}" onclick="setS({topic:'${t.id}'})">${t.e} ${esc(t.n)}</button>`).join('') + `</div>`;
     }
     if (S.mode === 'adult' && S.withPun && h) h += `<button class="ghost" onclick="addAdultPuns()">🔞 Додати 18+ покарання до колеса</button>`;
-    return h ? `<h3>Налаштування гри</h3><div class="card">${h}</div>` : '';
+    const rules = (window.RULES && RULES[g]) ? `<div class="card rules-card">📖 <b>Правила.</b> ${esc(RULES[g])}</div>` : '';
+    return rules + (h ? `<h3>Налаштування гри</h3><div class="card">${h}</div>` : '');
   };
 
   // ---------- Що б обрав ти ----------
