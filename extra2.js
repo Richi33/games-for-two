@@ -36,6 +36,12 @@
       h += `<div class="muted">Складність</div><div class="games" style="grid-template-columns:repeat(3,1fr)">`
         + [['easy', '🟢 Легко'], ['normal', '🟡 Звичайно'], ['hard', '🔴 Складно']].map(([k, l]) => btn(S.diff === k, `setS({diff:'${k}'})`, l, desc[k])).join('') + `</div>`;
     }
+    if (g === 'durak') {
+      h += `<div class="muted">Колода</div><div class="games">`
+        + btn(S.deck !== '52', `setS({deck:'36'})`, '🂠 36 карт', 'від 6 до туза')
+        + btn(S.deck === '52', `setS({deck:'52'})`, '🂠 52 карти', 'від 2 до туза')
+        + `</div>`;
+    }
     if (g === 'hang' || g === 'anag') {
       h += `<div class="muted" style="margin-top:10px">Мова слів</div><div class="games">`
         + btn(S.lang !== 'ru', `setS({lang:'uk'})`, '🇺🇦 Українська', 'Українські слова')
