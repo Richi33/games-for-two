@@ -20,7 +20,7 @@ button.dc{cursor:pointer}button.dc:disabled{opacity:1}
 .dnote{text-align:center;font-size:14px;color:var(--mu);min-height:20px}
 `;
   document.head.appendChild(st);
-  GAMES.push({ id: 'durak', e: '🃏', n: 'Дурень переводний', d: '36 або 52 карти' });
+  GAMES.push({ id: 'durak', e: '🃏', n: 'Дурень', d: 'Звичайний або переводний, 24/36/52' });
 
   const SY = ['♠', '♥', '♦', '♣'], RL = { 11: 'В', 12: 'Д', 13: 'К', 14: 'Т' };
   const lab = r => RL[r] || r;
@@ -51,12 +51,12 @@ button.dc{cursor:pointer}button.dc:disabled{opacity:1}
     const me = S.you, L = v.legal, tr = v.trump, mine = v.turn === me && S.phase === 'play';
     const handIds = v.hand.map(cid);
     if (!mine || !dSel || !handIds.includes(dSel) || !((L.beat[dSel] || []).length || L.tr.includes(dSel))) dSel = null;
-    const oname = esc(opp()), role = v.att === me ? '🗡 Ви атакуєте' : '🛡 Ви відбиваєтесь';
+    const oname = esc(opp()), role = (v.att === me ? '🗡 Ви атакуєте' : '🛡 Ви відбиваєтесь') + (v.perevod ? ' · переводний' : ' · звичайний');
     let st;
     if (S.phase === 'over') st = '';
     else if (v.ph === 'clear') st = v.kind === 'take' ? '🤲 Забирає карти…' : '✅ Бито!';
     else if (v.ph === 'attack') st = v.turn === me ? (v.table.length ? 'Усе побито: підкиньте або «Бито»' : 'Ваш хід: атакуйте') : `⏳ ${oname} ${v.table.length ? 'вирішує, чи підкидати' : 'атакує'}…`;
-    else if (v.ph === 'defend') st = v.turn === me ? 'Відбивайтесь: побийте, переведіть або візьміть' : `⏳ ${oname} відбивається…`;
+    else if (v.ph === 'defend') st = v.turn === me ? (v.perevod ? 'Відбивайтесь: побийте, переведіть або візьміть' : 'Відбивайтесь: побийте або візьміть') : `⏳ ${oname} відбивається…`;
     else st = v.turn === me ? `${oname} бере — можете підкинути` : `⏳ ${oname} підкидає…`;
 
     const pairs = v.table.map((x, i) => {
