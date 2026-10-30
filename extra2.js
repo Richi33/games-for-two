@@ -37,9 +37,11 @@
         + [['easy', '🟢 Легко'], ['normal', '🟡 Звичайно'], ['hard', '🔴 Складно']].map(([k, l]) => btn(S.diff === k, `setS({diff:'${k}'})`, l, desc[k])).join('') + `</div>`;
     }
     if (g === 'durak') {
-      h += `<div class="muted">Колода</div><div class="games">`
-        + btn(S.deck !== '52', `setS({deck:'36'})`, '🂠 36 карт', 'від 6 до туза')
-        + btn(S.deck === '52', `setS({deck:'52'})`, '🂠 52 карти', 'від 2 до туза')
+      h += `<div class="muted">Варіант гри</div><div class="games">`
+        + btn(S.perevod === false, `setS({perevod:false})`, '🃏 Звичайний', 'Без переводу')
+        + btn(S.perevod !== false, `setS({perevod:true})`, '↪ Переводний', 'Можна переводити')
+        + `</div><div class="muted" style="margin-top:10px">Колода</div><div class="games" style="grid-template-columns:repeat(3,1fr)">`
+        + [['24', '24 карти', '9 – туз'], ['36', '36 карт', '6 – туз'], ['52', '52 карти', '2 – туз']].map(([k, l, s2]) => btn((S.deck || '36') === k, `setS({deck:'${k}'})`, l, s2)).join('')
         + `</div>`;
     }
     if (g === 'hang' || g === 'anag') {

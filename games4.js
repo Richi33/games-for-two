@@ -5,7 +5,7 @@
 //  • роздача по 6 карт, козир — нижня карта колоди (вона лежить відкритою й береться останньою);
 //  • першим атакує власник найменшого козиря (якщо козирів немає — випадково);
 //  • побити можна старшою картою тієї ж масті або будь-яким козирем (козир — лише старшим козирем);
-//  • ПЕРЕВІД: поки жодну карту не побито, захисник кладе карту того ж рангу й передає атаку
+//  • ПЕРЕВІД (лише в «переводному» режимі; у «звичайному» вимкнений): поки жодну карту не побито, захисник кладе карту того ж рангу й передає атаку
 //    суперникові — якщо в того в руці не менше карт, ніж буде на столі;
 //  • підкидати можна карти рангів, що вже є на столі (до 6 пар і не більше, ніж карт у захисника);
 //  • «Беру»: атакувальник може ще підкинути, потім захисник забирає все;
@@ -38,7 +38,7 @@ function legalFor(s, p) {
       s.table.forEach((x, i) => { if (!x.d && beats(c, x.a, s.trump)) t.push(i); });
       if (t.length) L.beat[cid(c)] = t;
     });
-    if (s.table.every(x => !x.d) && s.table.length < 6 && s.table.length + 1 <= s.hands[s.att].length)
+    if (s.tr && s.table.every(x => !x.d) && s.table.length < 6 && s.table.length + 1 <= s.hands[s.att].length)
       L.tr = h.filter(c => c.r === s.table[0].a.r).map(cid);
     L.take = true;
   }
@@ -82,15 +82,15 @@ const sortHand = (h, t) => [...h].sort((x, y) => ((x.s === t ? 4 : x.s) - (y.s =
 
 const durak = {
   init(o) {
-    const n = o && o.deck === '52' ? 52 : 36;
-    const lo = n === 52 ? 2 : 6, talon = [];
+    const n = o && o.deck === '52' ? 52 : o && o.deck === '24' ? 24 : 36;
+    const lo = n === 52 ? 2 : n === 36 ? 6 : 9, talon = [];
     for (let s = 0; s < 4; s++) for (let r = lo; r <= 14; r++) talon.push({ s, r });
     shuffle(talon);
     const hands = [talon.splice(0, 6), talon.splice(0, 6)];
     const trump = talon[talon.length - 1].s;
     const low = hands.map(h => Math.min(99, ...h.filter(c => c.s === trump).map(c => c.r)));
     const att = low[0] === low[1] ? rnd(2) : (low[0] < low[1] ? 0 : 1);
-    return { n, talon, hands, trump, att, table: [], ph: 'attack', kind: null, out: 0, winner: null };
+    return { n, tr: !(o && o.perevod === false), talon, hands, trump, att, table: [], ph: 'attack', kind: null, out: 0, winner: null };
   },
   move(s, p, m, sched) {
     if (s.ph === 'clear') return ERR('Зачекайте');
@@ -133,7 +133,7 @@ const durak = {
   },
   view(s, p) {
     return {
-      n: s.n, trump: s.trump, trumpCard: s.talon.length ? s.talon[s.talon.length - 1] : null, talon: s.talon.length,
+      n: s.n, perevod: s.tr, trump: s.trump, trumpCard: s.talon.length ? s.talon[s.talon.length - 1] : null, talon: s.talon.length,
       hand: sortHand(s.hands[p], s.trump), opp: s.hands[1 - p].length, oppHand: s.winner != null ? sortHand(s.hands[1 - p], s.trump) : null,
       table: s.table, ph: s.ph, kind: s.kind, att: s.att,
       turn: s.ph === 'defend' ? 1 - s.att : (s.ph === 'clear' ? null : s.att),

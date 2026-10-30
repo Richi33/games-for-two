@@ -45,7 +45,7 @@ function snapshot(r, i) {
   return {
     type: 'room', code: r.code, you: i,
     names: r.players.map(p => p && p.name), online: r.players.map(p => !!(p && p.ws)),
-    game: r.game, diff: r.diff, deck: r.deck, lang: r.lang, mode: r.mode, topic: r.topic, topics: r.phase === 'lobby' ? content.topicsFor(r.mode) : undefined, withPun: r.withPun, puns: r.puns, phase: r.phase, wheel: r.wheel, punishment: r.punishment,
+    game: r.game, diff: r.diff, deck: r.deck, perevod: r.perevod, lang: r.lang, mode: r.mode, topic: r.topic, topics: r.phase === 'lobby' ? content.topicsFor(r.mode) : undefined, withPun: r.withPun, puns: r.puns, phase: r.phase, wheel: r.wheel, punishment: r.punishment,
     winner: r.state ? r.state.winner : null,
     view: playing ? games[r.game].view(r.state, i) : null,
   };
@@ -66,7 +66,7 @@ function check(r) { if (r.state && r.state.winner != null) r.phase = 'over'; }
 
 function begin(r) {
   const g = games[r.game];
-  r.state = g.init({ diff: r.diff, deck: r.deck, lang: r.lang, mode: r.mode, topic: r.topic }); r.phase = 'play';
+  r.state = g.init({ diff: r.diff, deck: r.deck, perevod: r.perevod, lang: r.lang, mode: r.mode, topic: r.topic }); r.phase = 'play';
   if (g.start) g.start(r.state, sched(r));
   broadcast(r);
 }
@@ -95,7 +95,7 @@ function cleanPuns(a) {
 function handle(ws, m) {
   if (m.type === 'create') {
     const code = newCode();
-    const r = { code, players: [null, null], game: 'ttt', diff: 'normal', deck: '36', lang: 'uk', mode: 'normal', topic: 'mix', withPun: false, puns: [...DEFAULT_PUNS], phase: 'lobby', state: null, wheel: null, punishment: null, timers: new Set() };
+    const r = { code, players: [null, null], game: 'ttt', diff: 'normal', deck: '36', perevod: true, lang: 'uk', mode: 'normal', topic: 'mix', withPun: false, puns: [...DEFAULT_PUNS], phase: 'lobby', state: null, wheel: null, punishment: null, timers: new Set() };
     rooms.set(code, r);
     ws.room = r; ws.idx = 0; ws.token = String(m.token || '');
     r.players[0] = { ws, name: String(m.name || 'Гравець').slice(0, 20), token: ws.token };
@@ -123,7 +123,8 @@ function handle(ws, m) {
       if (typeof m.game === 'string' && Object.prototype.hasOwnProperty.call(games, m.game)) r.game = m.game;
       if (['easy', 'normal', 'hard'].includes(m.diff)) r.diff = m.diff;
       if (m.lang === 'uk' || m.lang === 'ru') r.lang = m.lang;
-      if (m.deck === '36' || m.deck === '52') r.deck = m.deck;
+      if (m.deck === '24' || m.deck === '36' || m.deck === '52') r.deck = m.deck;
+      if (typeof m.perevod === 'boolean') r.perevod = m.perevod;
       if (m.mode === 'normal' || m.mode === 'adult') { if (r.mode !== m.mode) r.topic = 'mix'; r.mode = m.mode; }
       if (typeof m.topic === 'string' && (m.topic === 'mix' || content.topicsFor(r.mode).some(x => x.id === m.topic))) r.topic = m.topic;
       if (typeof m.withPun === 'boolean') r.withPun = m.withPun;
