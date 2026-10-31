@@ -176,3 +176,4 @@ module.exports = { ttt, rps, mem, bs, guess, react, nim, dots };
 Object.assign(module.exports, require('./games2'));
 Object.assign(module.exports, require('./games3'));
 Object.assign(module.exports, require('./games4'));
+Object.assign(module.exports, require('./games5'));

@@ -22,7 +22,7 @@
   );
 
   const ADULT_PUNS = ['Поцілунок у щоку', 'Масаж плечей 2 хвилини', 'Шепотіти компліменти хвилину', 'Станцювати повільний танець', 'Описати ідеальне побачення', 'Подивитись в очі 30 секунд', 'Написати флірт-повідомлення', 'Обійняти на 20 секунд'];
-  const CONTENT = ['wyr', 'know', 'tod'];
+  const CONTENT = ['wyr', 'know', 'tod', 'cards'];
   window.addAdultPuns = () => setS({ puns: [...S.puns, ...ADULT_PUNS.filter(x => !S.puns.includes(x))].slice(0, 24) });
 
   // ---------- налаштування в лобі ----------
@@ -44,11 +44,15 @@
         + [['24', '24 карти', '9 – туз'], ['36', '36 карт', '6 – туз'], ['52', '52 карти', '2 – туз']].map(([k, l, s2]) => btn((S.deck || '36') === k, `setS({deck:'${k}'})`, l, s2)).join('')
         + `</div>`;
     }
-    if (g === 'hang' || g === 'anag') {
+    if (g === 'hang' || g === 'anag' || g === 'wordle') {
       h += `<div class="muted" style="margin-top:10px">Мова слів</div><div class="games">`
         + btn(S.lang !== 'ru', `setS({lang:'uk'})`, '🇺🇦 Українська', 'Українські слова')
         + btn(S.lang === 'ru', `setS({lang:'ru'})`, 'Російська', 'Русские слова')
         + `</div>`;
+    }
+    if (g === 'wordle') {
+      h += `<div class="muted" style="margin-top:10px">Довжина слова</div><div class="games" style="grid-template-columns:repeat(4,1fr)">`
+        + [5, 6, 7, 8].map(n => btn((S.len || 5) === n, `setS({len:${n}})`, n + ' літер', '')).join('') + `</div>`;
     }
     if (CONTENT.includes(g)) {
       h += `<div class="muted">Режим</div><div class="games">`
