@@ -15,6 +15,7 @@ const STATIC = {
   '/rules.js': ['rules.js', 'text/javascript'],
   '/extra3.js': ['extra3.js', 'text/javascript'],
   '/extra4.js': ['extra4.js', 'text/javascript'],
+  '/extra5.js': ['extra5.js', 'text/javascript'],
   '/manifest.webmanifest': ['manifest.webmanifest', 'application/manifest+json'],
   '/icon-192.png': ['icon-192.png', 'image/png'],
   '/icon-512.png': ['icon-512.png', 'image/png'],
@@ -31,6 +32,7 @@ const server = http.createServer((req, res) => {
 
 const DEFAULT_PUNS = ['10 присідань', 'Заспівати уривок пісні', 'Розповісти жарт', 'Зробити комплімент переможцю', 'Танцювати 30 секунд', 'Масаж плечей 1 хвилину', 'Розповісти секрет', 'Принести переможцю напій'];
 const rooms = new Map();
+const REACTS = ['😂', '👏', '😡', '😮', '❤️', '🔥', '👍', '😭'];
 const rnd = n => (Math.random() * n) | 0;
 
 function newCode() {
@@ -47,7 +49,7 @@ function snapshot(r, i) {
     type: 'room', code: r.code, you: i,
     names: r.players.map(p => p && p.name), online: r.players.map(p => !!(p && p.ws)),
     game: r.game, diff: r.diff, deck: r.deck, perevod: r.perevod, lang: r.lang, len: r.len, mode: r.mode, topic: r.topic, topics: r.phase === 'lobby' ? content.topicsFor(r.mode) : undefined, withPun: r.withPun, puns: r.puns, phase: r.phase, wheel: r.wheel, punishment: r.punishment,
-    winner: r.state ? r.state.winner : null,
+    winner: r.state ? r.state.winner : null, series: r.series,
     view: playing ? games[r.game].view(r.state, i) : null,
   };
 }
@@ -63,7 +65,15 @@ function sched(r) {
     r.timers.add(t);
   };
 }
-function check(r) { if (r.state && r.state.winner != null) r.phase = 'over'; }
+const newSeries = () => ({ w: [0, 0], d: 0, hist: [] });
+function check(r) {
+  if (!r.state || r.state.winner == null || r.phase === 'over') return;
+  r.phase = 'over';
+  const w = r.state.winner, S = r.series;                      // рахунок серії та історія покарань
+  if (w === 'draw') S.d++; else S.w[w]++;
+  S.hist.push({ g: r.game, w, p: r.withPun && r.punishment && w !== 'draw' ? r.punishment : null });
+  if (S.hist.length > 30) S.hist.shift();
+}
 
 function begin(r) {
   const g = games[r.game];
@@ -96,7 +106,7 @@ function cleanPuns(a) {
 function handle(ws, m) {
   if (m.type === 'create') {
     const code = newCode();
-    const r = { code, players: [null, null], game: 'ttt', diff: 'normal', deck: '36', perevod: true, lang: 'uk', len: 5, mode: 'normal', topic: 'mix', withPun: false, puns: [...DEFAULT_PUNS], phase: 'lobby', state: null, wheel: null, punishment: null, timers: new Set() };
+    const r = { code, players: [null, null], game: 'ttt', diff: 'normal', deck: '36', perevod: true, lang: 'uk', len: 5, mode: 'normal', topic: 'mix', withPun: false, puns: [...DEFAULT_PUNS], phase: 'lobby', state: null, wheel: null, punishment: null, timers: new Set(), series: newSeries(), chat: [] };
     rooms.set(code, r);
     ws.room = r; ws.idx = 0; ws.token = String(m.token || '');
     r.players[0] = { ws, name: String(m.name || 'Гравець').slice(0, 20), token: ws.token };
@@ -110,11 +120,13 @@ function handle(ws, m) {
     if (i === -1) i = r.players.findIndex(p => !p);
     if (i === -1) return send(ws, { type: 'error', msg: 'Кімната вже заповнена', fatal: true });
     const old = r.players[i];
+    if (!old) { r.series = newSeries(); r.chat = []; }
     if (old && old.ws && old.ws !== ws) { old.ws.room = null; old.ws.close(); }
     ws.room = r; ws.idx = i; ws.token = token;
     r.players[i] = { ws, name: String(m.name || 'Гравець').slice(0, 20), token };
     r.dead && clearTimeout(r.dead);
-    return broadcast(r);
+    broadcast(r); send(ws, { type: 'chathist', list: r.chat });
+    return;
   }
   const r = ws.room, i = ws.idx;
   if (!r) return;
@@ -152,8 +164,20 @@ function handle(ws, m) {
     case 'again':
       if (r.phase === 'over') { toLobby(r); broadcast(r); }
       return;
+    case 'react': {
+      if (!REACTS.includes(m.e)) return;
+      r.players.forEach(p => p && send(p.ws, { type: 'react', from: i, e: m.e })); return;
+    }
+    case 'chat': {
+      const t = String(m.t || '').trim().replace(/\s+/g, ' ').slice(0, 120), now = Date.now();
+      if (!t || now - (ws.lastChat || 0) < 300) return;
+      ws.lastChat = now;
+      const msg = { from: i, name: r.players[i] ? r.players[i].name : '', t, ts: now };
+      r.chat.push(msg); if (r.chat.length > 30) r.chat.shift();
+      r.players.forEach(p => p && send(p.ws, { type: 'chat', ...msg })); return;
+    }
     case 'leave':
-      r.players[i] = null; ws.room = null;
+      r.players[i] = null; ws.room = null; r.series = newSeries(); r.chat = [];
       if (!r.players[0] && !r.players[1]) { clearTimers(r); rooms.delete(r.code); }
       else { toLobby(r); broadcast(r); }
       return;
