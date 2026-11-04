@@ -17,7 +17,8 @@ function dict(lang) {
   const rd = f => zlib.gunzipSync(fs.readFileSync(path.join(__dirname, 'dict', f))).toString('utf8').split('\n').filter(Boolean);
   const words = new Set(rd('words_' + lang + '.txt.gz'));
   const answers = { 5: [], 6: [], 7: [], 8: [] };
-  rd('answers_' + lang + '.txt.gz').forEach(w => { if (answers[w.length]) answers[w.length].push(w); });
+  const BAD = lang === 'ru' ? /(ете|ите|ешь|ишь|ают|яют|уют|ются|ется|ится|утся|атся|ятся)$/ : /(уть|ють|ємо|имо|ете|ите|ться)$/;   // дієвідмінювані форми не загадуємо
+  rd('answers_' + lang + '.txt.gz').forEach(w => { if (answers[w.length] && !BAD.test(w)) answers[w.length].push(w); });
   return (DICT[lang] = { words, answers });
 }
 const wnorm = (lang, w) => { w = String(w || '').trim().toLowerCase(); return lang === 'ru' ? w.replace(/ё/g, 'е') : w; };
@@ -28,12 +29,15 @@ function wscore(g, s) {                       // 'g' — на місці, 'y' �
   return r.join('');
 }
 const WMAX = 6;
+const kyivDay = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Kyiv' }).format(new Date());   // «слово дня» — те саме для всіх у цю добу
+const dayHash = str => { let h = 2166136261; for (const ch of str) { h ^= ch.codePointAt(0); h = Math.imul(h, 16777619) >>> 0; } return h; };
 const wordle = {
   init(o) {
     const lang = o && o.lang === 'ru' ? 'ru' : 'uk';
     const len = o && isInt(o.len, 5, 8) ? o.len : 5;
     const d = dict(lang), pool = d.answers[len];
-    return { lang, len, word: pool[rnd(pool.length)], g: [[], []], res: [[], []], done: [false, false], solved: [false, false], winner: null };
+    const daily = !!(o && o.daily), word = daily ? pool[dayHash(lang + len + kyivDay()) % pool.length] : pool[rnd(pool.length)];
+    return { lang, len, daily, word, g: [[], []], res: [[], []], done: [false, false], solved: [false, false], winner: null };
   },
   move(s, p, m) {
     if (m.a !== 'g') return { error: 'Невірна дія' };
@@ -52,7 +56,7 @@ const wordle = {
   view(s, p) {
     const over = s.winner != null, o = 1 - p;
     return {
-      lang: s.lang, len: s.len, max: WMAX, mine: { g: s.g[p], res: s.res[p] }, opp: { res: s.res[o], n: s.g[o].length, g: over ? s.g[o] : null },
+      lang: s.lang, len: s.len, daily: s.daily, max: WMAX, mine: { g: s.g[p], res: s.res[p] }, opp: { res: s.res[o], n: s.g[o].length, g: over ? s.g[o] : null },
       done: s.done[p], oppDone: s.done[o], word: over ? s.word : null,
     };
   },
@@ -126,9 +130,13 @@ const dixit = {
 const CARDS_ROUNDS = 8;
 const cards = {
   init(o) {
-    const adult = o && o.mode === 'adult';
-    const blacks = shuffle([...(adult ? content2.BLACK.adult : content2.BLACK.normal)]).slice(0, CARDS_ROUNDS);
-    const whites = shuffle([...(adult ? [...content2.WHITE.adult, ...content2.WHITE.normal.slice(0, 40)] : content2.WHITE.normal)]);
+    const adult = o && o.mode === 'adult', pack = o && o.pack, P = content2.PACKS, cu = (o && o.custom) || {};
+    const ids = pack && P[pack] ? [pack] : Object.keys(P);
+    const bl = adult ? content2.BLACK.adult : [].concat(...ids.map(id => P[id].black));
+    const wh = adult ? [...content2.WHITE.adult, ...content2.WHITE.normal.slice(0, 40)] : [...content2.WHITE.normal, ...[].concat(...ids.map(id => P[id].white))];
+    const myB = cu.black || [], useOnlyB = cu.only && myB.length >= 3;
+    const blacks = useOnlyB ? shuffle([...myB]).slice(0, CARDS_ROUNDS) : shuffle([...shuffle([...myB]).slice(0, 3), ...shuffle([...bl]).slice(0, CARDS_ROUNDS)]).slice(0, CARDS_ROUNDS);
+    const whites = shuffle([...wh, ...(cu.white || []), ...(cu.white || [])]);      // власні білі карти зустрічаються частіше
     const hands = [whites.splice(0, 7), whites.splice(0, 7)];
     return { blacks, whites, hands, r: 0, ph: 'play', pick: [null, null], rate: [null, null], score: [0, 0], winner: null };
   },

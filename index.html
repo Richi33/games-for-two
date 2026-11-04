@@ -321,7 +321,7 @@ function render() {
   else if (S.phase === 'wheel') h = wheelScreen();
   else h = game();
   $('#app').innerHTML = h;
-  for (const id in keep) { const el = document.getElementById(id); if (el && (id === 'np' || id === 'gn' || id === 'dv') && (!el.dataset.ctx || el.dataset.ctx === keep[id][1])) { el.value = keep[id][0]; if (act === id) el.focus(); } }
+  for (const id in keep) { const el = document.getElementById(id); if (el && (id === 'np' || id === 'gn' || id === 'dv' || id === 'cu') && (!el.dataset.ctx || el.dataset.ctx === keep[id][1])) { el.value = keep[id][0]; if (act === id) el.focus(); } }
   if (S && S.phase === 'lobby' && S.withPun && S.puns.length >= 2) drawWheel($('#wheel'), S.puns, 0);
   if (S && S.phase === 'wheel') spin();
   if (S && S.phase === 'lobby') runSeq = null;
@@ -346,5 +346,6 @@ render(); connect();
 <script src="/extra3.js"></script>
 <script src="/extra4.js"></script>
 <script src="/extra5.js"></script>
+<script src="/extra6.js"></script>
 </body>
 </html>

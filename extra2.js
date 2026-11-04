@@ -65,9 +65,19 @@
         + `<button class="chip ${S.topic === 'mix' ? 'on' : ''}" onclick="setS({topic:'mix'})">🎲 Мікс</button>`
         + S.topics.map(t => `<button class="chip ${S.topic === t.id ? 'on' : ''}" onclick="setS({topic:'${t.id}'})">${t.e} ${esc(t.n)}</button>`).join('') + `</div>`;
     }
+    if (g === 'cards' && S.mode !== 'adult' && S.packs) {
+      h += `<div class="muted" style="margin-top:10px">Тема карт</div><div class="chips"><button class="chip ${S.pack === 'mix' ? 'on' : ''}" onclick="setS({pack:'mix'})">🎲 Усе</button>`
+        + S.packs.map(p => `<button class="chip ${S.pack === p.id ? 'on' : ''}" onclick="setS({pack:'${p.id}'})">${p.e} ${esc(p.n)}</button>`).join('') + `</div>`;
+    }
+    if (g === 'wordle') {
+      h += `<div class="muted" style="margin-top:10px">Слово</div><div class="games">`
+        + btn(!S.daily, `setS({daily:false})`, '🎲 Випадкове', 'Нове щоразу')
+        + btn(!!S.daily, `setS({daily:true})`, '📅 Слово дня', 'Однакове для всіх сьогодні')
+        + `</div>`;
+    }
     if (S.mode === 'adult' && S.withPun && h) h += `<button class="ghost" onclick="addAdultPuns()">🔞 Додати 18+ покарання до колеса</button>`;
     const rules = (window.RULES && RULES[g]) ? `<div class="card rules-card">📖 <b>Правила.</b> ${esc(RULES[g])}</div>` : '';
-    return rules + (h ? `<h3>Налаштування гри</h3><div class="card">${h}</div>` : '');
+    return rules + (h ? `<h3>Налаштування гри</h3><div class="card">${h}</div>` : '') + (window.customHtml ? customHtml(g) : '');
   };
 
   // ---------- Що б обрав ти ----------
