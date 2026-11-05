@@ -5,7 +5,9 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
 <meta name="theme-color" content="#1b1d2a">
 <link rel="manifest" href="/manifest.webmanifest">
-<link rel="apple-touch-icon" href="/icon-192.png">
+<link rel="apple-touch-icon" href="/icon-180.png">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<meta name="color-scheme" content="dark light">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <title>Ігри на двох</title>
 <style>
@@ -78,13 +80,49 @@ label.chk{display:flex;gap:10px;align-items:center;padding:8px 0}label.chk input
 .hbtns{display:flex;gap:2px}
 .serie{text-align:center;font-size:14px;color:var(--mu);margin:6px 0}.serie b{color:inherit}
 .hist{margin-top:8px;font-size:14px}.hist summary{cursor:pointer;color:var(--mu)}.hrow{background:var(--bg);border-radius:10px;padding:6px 10px;margin:4px 0}.hrow small{color:var(--mu)}
+
+/* ---- світла тема ---- */
+:root[data-theme=light]{--bg:#f2f3fa;--card:#fff;--card2:#e7e9f6;--tx:#1b1d2a;--mu:#5d6488;--ac:#6554f0;--ok:#1f9d62;--bad:#e03a5c;--p0:#1f78e0;--p1:#d63a80}
+:root[data-theme=light] body{color-scheme:light}
+:root[data-theme=light] .gbtn.on,:root[data-theme=light] .chip.on{background:#dcd8ff}
+:root[data-theme=light] .banner.win{background:#cdf3e0}:root[data-theme=light] .banner.lose{background:#fadadf}
+:root[data-theme=light] .badge{background:#fff0cc;color:#7a5200}
+:root[data-theme=light] .cell.win{background:#bdeed3}:root[data-theme=light] .mem.mo0{background:#cfe3ff}:root[data-theme=light] .mem.mo1{background:#ffd5e6}
+:root[data-theme=light] .wo.op{background:#d3ecfb}:root[data-theme=light] .wo.me.op{background:#d0f3e1}
+:root[data-theme=light] .ed.free{stroke:#ccd0ea}:root[data-theme=light] .stick{background:#d8a24a}
+:root[data-theme=light] .wt.b,:root[data-theme=light] .wkb button.b{background:#c9cde0;color:#333a5c;border-color:#c9cde0}:root[data-theme=light] .wkb button.b{color:#8c92b4}
+:root[data-theme=light] .wt{border-color:#c9cde0}:root[data-theme=light] .wm i{background:#c9cde0}:root[data-theme=light] .wm i.e{background:#e3e5f2}
+:root[data-theme=light] .pic.ok,:root[data-theme=light] .scale button.ok,:root[data-theme=light] .qb.ok{color:#fff}
+:root[data-theme=light] #cin,:root[data-theme=light] input[type=text]{background:#fff}
+#thm{position:fixed;left:12px;bottom:calc(14px + env(safe-area-inset-bottom));z-index:20;width:40px;height:40px;border-radius:50%;padding:0;font-size:18px;opacity:.75;background:var(--card2)}
+/* ---- планшет і комп'ютер ---- */
+@media(min-width:720px){#app{max-width:720px;padding:22px}.games{grid-template-columns:repeat(3,1fr)}.grid.g3{max-width:420px}.grid.g4{max-width:460px}.code{font-size:54px}.dots{max-width:520px}.bsw>div{max-width:400px}.react{height:320px}}
+@media(min-width:1100px){body{font-size:17px}#app{max-width:860px}.games{grid-template-columns:repeat(4,1fr)}.grid.g3{max-width:460px}}
+/* ---- анімації ---- */
+button{transition:background .15s,transform .08s,opacity .15s}button:active:not(:disabled){transform:scale(.97)}
+#app{animation:fadein .3s ease-out}@keyframes fadein{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+.banner{animation:pop .4s cubic-bezier(.2,1.4,.4,1)}@keyframes pop{from{opacity:0;transform:scale(.88)}to{opacity:1;transform:none}}
+.badge,.serie{animation:fadein .3s ease-out}
+@media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 </style>
 </head>
 <body>
 <div id="conn"></div>
 <div id="app"></div>
 <div id="toast"></div>
+<button id="thm" onclick="cycleTheme()" aria-label="Змінити тему">🌓</button>
 <script>
+// тема: auto / dark / light (запам'ятовується)
+const THEMES = ['auto', 'dark', 'light'];
+function themePref() { try { return localStorage.theme || 'auto'; } catch (e) { return 'auto'; } }
+function applyTheme() {
+  const p = themePref(), light = p === 'light' || (p === 'auto' && matchMedia('(prefers-color-scheme: light)').matches);
+  document.documentElement.dataset.theme = light ? 'light' : 'dark';
+  const m = document.querySelector('meta[name=theme-color]'); if (m) m.content = light ? '#f2f3fa' : '#1b1d2a';
+  const b = document.getElementById('thm'); if (b) { b.textContent = p === 'auto' ? '🌓' : p === 'light' ? '☀️' : '🌙'; b.title = 'Тема: ' + p; }
+}
+function cycleTheme() { const n = THEMES[(THEMES.indexOf(themePref()) + 1) % 3]; try { localStorage.theme = n; } catch (e) {} applyTheme(); toast('Тема: ' + { auto: 'як у системі', dark: 'темна', light: 'світла' }[n]); }
+applyTheme(); matchMedia('(prefers-color-scheme: light)').addEventListener('change', applyTheme);
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const GAMES = [
@@ -368,7 +406,7 @@ document.addEventListener('pointerdown', e => {
 });
 
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(() => {});
-render(); connect();
+render(); connect(); applyTheme();
 </script>
 <script src="/extra.js"></script>
 <script src="/rules.js"></script>

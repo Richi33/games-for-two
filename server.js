@@ -22,6 +22,10 @@ const STATIC = {
   '/manifest.webmanifest': ['manifest.webmanifest', 'application/manifest+json'],
   '/icon-192.png': ['icon-192.png', 'image/png'],
   '/icon-512.png': ['icon-512.png', 'image/png'],
+  '/icon-180.png': ['icon-180.png', 'image/png'],
+  '/icon-maskable-512.png': ['icon-maskable-512.png', 'image/png'],
+  '/favicon.svg': ['favicon.svg', 'image/svg+xml'],
+  '/offline.html': ['offline.html', 'text/html; charset=utf-8'],
 };
 const server = http.createServer((req, res) => {
   const hit = STATIC[req.url.split('?')[0]];

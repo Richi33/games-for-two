@@ -9,10 +9,10 @@
 .wt.cur{border-color:#8a93d6}
 .wopp{display:flex;gap:10px;justify-content:center;align-items:flex-start;margin:6px 0;font-size:13px;color:var(--mu)}
 .wm{display:grid;gap:2px}.wm div{display:flex;gap:2px}.wm i{width:9px;height:9px;border-radius:2px;background:#3a3f55}.wm i.g{background:#2e9e5b}.wm i.y{background:#c9a227}.wm i.e{background:#2a2e4a}
-.kb{display:flex;flex-direction:column;gap:5px;margin:10px 0}.kr{display:flex;gap:3px;justify-content:center}
-.kb button{flex:1 1 0;min-width:0;padding:11px 0;font-size:16px;font-weight:700;margin:0;border-radius:7px;text-transform:uppercase}
-.kb button.g{background:#2e9e5b;color:#fff}.kb button.y{background:#c9a227;color:#fff}.kb button.b{background:#23263a;color:#667}
-.kb button.w{flex:1.6;font-size:15px}
+.wkb{display:flex;flex-direction:column;gap:5px;margin:10px 0}.wkr{display:flex;gap:3px;justify-content:center}
+.wkb button{flex:1 1 0;min-width:0;padding:11px 0;font-size:16px;font-weight:700;margin:0;border-radius:7px;text-transform:uppercase}
+.wkb button.g{background:#2e9e5b;color:#fff}.wkb button.y{background:#c9a227;color:#fff}.wkb button.b{background:#23263a;color:#667}
+.wkb button.w{flex:1.6;font-size:15px}
 .dxg{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:10px 0}.dxg.four{grid-template-columns:repeat(2,1fr)}
 .dxc{position:relative;padding:0;border:3px solid transparent;border-radius:12px;overflow:hidden;background:#000;aspect-ratio:5/7;display:block;cursor:pointer}
 .dxc svg{width:100%;height:100%;display:block}.dxc.sel{border-color:var(--ac);transform:translateY(-3px)}.dxc.mine{opacity:.5;cursor:default}
@@ -67,14 +67,14 @@
     }
     const oppRows = [...Array(v.max)].map((_, i) => `<div>${[...Array(L)].map((_, j) => `<i class="${v.opp.res[i] ? v.opp.res[i][j] : 'e'}"></i>`).join('')}</div>`).join('');
     const over = S.phase === 'over';
-    const kb = KBL[v.lang].map((row, ri) => `<div class="kr">${ri === 2 ? '<button class="w" onclick="wKey(\'⏎\')">⏎</button>' : ''}${[...row].map(c => `<button class="${best[c] || ''}" onclick="wKey('${c}')">${c}</button>`).join('')}${ri === 2 ? '<button class="w" onclick="wKey(\'⌫\')">⌫</button>' : ''}</div>`).join('');
+    const kb = KBL[v.lang].map((row, ri) => `<div class="wkr">${ri === 2 ? '<button class="w" onclick="wKey(\'⏎\')">⏎</button>' : ''}${[...row].map(c => `<button class="${best[c] || ''}" onclick="wKey('${c}')">${c}</button>`).join('')}${ri === 2 ? '<button class="w" onclick="wKey(\'⌫\')">⌫</button>' : ''}</div>`).join('');
     let st;
     if (over) st = 'Слово: ' + esc(v.word).toUpperCase();
     else if (v.done) st = '⏳ Спроби закінчились — чекаємо суперника';
     else st = `Спроба ${v.mine.g.length + 1}/${v.max} · ${v.lang === 'ru' ? 'російською' : 'українською'}, ${L} літер`;
     const oppInfo = `<div class="wopp"><div class="wm">${oppRows}</div><div style="align-self:center">${esc(opp())}: ${v.opp.n} спроб${v.oppDone && !over ? ' (все)' : ''}</div></div>`;
     const reveal = over ? `<div class="big">Слово — <b>${esc(v.word).toUpperCase()}</b></div>` : '';
-    return { st, html: `${oppInfo}<div class="wg">${rows.join('')}</div>${reveal}${over || v.done ? '' : `<div class="kb">${kb}</div>`}` };
+    return { st, html: `${oppInfo}<div class="wg">${rows.join('')}</div>${reveal}${over || v.done ? '' : `<div class="wkb">${kb}</div>`}` };
   };
 
   // ---------- Діксіт: картки малюються з числа-«насіння» (оригінальна графіка) ----------
