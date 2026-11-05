@@ -4,6 +4,7 @@ const path = require('path');
 const { WebSocketServer } = require('ws');
 const games = require('./games');
 const content = require('./content');
+const content2 = require('./content2');
 
 const PORT = process.env.PORT || 3000;
 const STATIC = {
@@ -16,6 +17,7 @@ const STATIC = {
   '/extra3.js': ['extra3.js', 'text/javascript'],
   '/extra4.js': ['extra4.js', 'text/javascript'],
   '/extra5.js': ['extra5.js', 'text/javascript'],
+  '/extra6.js': ['extra6.js', 'text/javascript'],
   '/manifest.webmanifest': ['manifest.webmanifest', 'application/manifest+json'],
   '/icon-192.png': ['icon-192.png', 'image/png'],
   '/icon-512.png': ['icon-512.png', 'image/png'],
@@ -48,7 +50,7 @@ function snapshot(r, i) {
   return {
     type: 'room', code: r.code, you: i,
     names: r.players.map(p => p && p.name), online: r.players.map(p => !!(p && p.ws)),
-    game: r.game, diff: r.diff, deck: r.deck, perevod: r.perevod, lang: r.lang, len: r.len, mode: r.mode, topic: r.topic, topics: r.phase === 'lobby' ? content.topicsFor(r.mode) : undefined, withPun: r.withPun, puns: r.puns, phase: r.phase, wheel: r.wheel, punishment: r.punishment,
+    game: r.game, diff: r.diff, deck: r.deck, perevod: r.perevod, lang: r.lang, len: r.len, daily: r.daily, mode: r.mode, topic: r.topic, pack: r.pack, packs: r.phase === 'lobby' ? content2.PACK_LIST : undefined, custom: r.custom, topics: r.phase === 'lobby' ? content.topicsFor(r.mode) : undefined, withPun: r.withPun, puns: r.puns, phase: r.phase, wheel: r.wheel, punishment: r.punishment,
     winner: r.state ? r.state.winner : null, series: r.series,
     view: playing ? games[r.game].view(r.state, i) : null,
   };
@@ -65,6 +67,20 @@ function sched(r) {
     r.timers.add(t);
   };
 }
+const emptyCustom = () => ({ know: [], wyr: [], tod: [], black: [], white: [], only: false });
+const txt = (x, n) => String(x == null ? '' : x).trim().replace(/\s+/g, ' ').slice(0, n);
+function cleanCustom(c) {                               // власні питання й завдання з лобі
+  if (!c || typeof c !== 'object') return null;
+  const arr = (a, f) => (Array.isArray(a) ? a.map(f).filter(Boolean).slice(0, 30) : []);
+  return {
+    know: arr(c.know, x => { const o = x && Array.isArray(x.o) ? x.o.map(t => txt(t, 40)).filter(Boolean).slice(0, 4) : []; const q = txt(x && x.q, 100); return q && o.length >= 2 ? { q, o } : null; }),
+    wyr: arr(c.wyr, x => { const o = x && Array.isArray(x.o) ? x.o.map(t => txt(t, 50)).filter(Boolean) : []; return o.length === 3 ? { o } : null; }),
+    tod: arr(c.tod, x => { const t = txt(x && x.t, 100); return t && (x.k === 't' || x.k === 'd') ? { k: x.k, t } : null; }),
+    black: arr(c.black, x => { const t = txt(x, 120); return t.includes('___') ? t : null; }),
+    white: arr(c.white, x => txt(x, 60) || null),
+    only: c.only === true,
+  };
+}
 const newSeries = () => ({ w: [0, 0], d: 0, hist: [] });
 function check(r) {
   if (!r.state || r.state.winner == null || r.phase === 'over') return;
@@ -77,7 +93,7 @@ function check(r) {
 
 function begin(r) {
   const g = games[r.game];
-  r.state = g.init({ diff: r.diff, deck: r.deck, perevod: r.perevod, lang: r.lang, len: r.len, mode: r.mode, topic: r.topic }); r.phase = 'play';
+  r.state = g.init({ diff: r.diff, deck: r.deck, perevod: r.perevod, lang: r.lang, len: r.len, daily: r.daily, mode: r.mode, topic: r.topic, pack: r.pack, custom: r.custom }); r.phase = 'play';
   if (g.start) g.start(r.state, sched(r));
   broadcast(r);
 }
@@ -106,7 +122,7 @@ function cleanPuns(a) {
 function handle(ws, m) {
   if (m.type === 'create') {
     const code = newCode();
-    const r = { code, players: [null, null], game: 'ttt', diff: 'normal', deck: '36', perevod: true, lang: 'uk', len: 5, mode: 'normal', topic: 'mix', withPun: false, puns: [...DEFAULT_PUNS], phase: 'lobby', state: null, wheel: null, punishment: null, timers: new Set(), series: newSeries(), chat: [] };
+    const r = { code, players: [null, null], game: 'ttt', diff: 'normal', deck: '36', perevod: true, lang: 'uk', len: 5, daily: false, pack: 'mix', custom: emptyCustom(), mode: 'normal', topic: 'mix', withPun: false, puns: [...DEFAULT_PUNS], phase: 'lobby', state: null, wheel: null, punishment: null, timers: new Set(), series: newSeries(), chat: [] };
     rooms.set(code, r);
     ws.room = r; ws.idx = 0; ws.token = String(m.token || '');
     r.players[0] = { ws, name: String(m.name || 'Гравець').slice(0, 20), token: ws.token };
@@ -137,6 +153,9 @@ function handle(ws, m) {
       if (['easy', 'normal', 'hard'].includes(m.diff)) r.diff = m.diff;
       if (m.lang === 'uk' || m.lang === 'ru') r.lang = m.lang;
       if (Number.isInteger(m.len) && m.len >= 5 && m.len <= 8) r.len = m.len;
+      if (typeof m.daily === 'boolean') r.daily = m.daily;
+      if (m.pack === 'mix' || (typeof m.pack === 'string' && Object.prototype.hasOwnProperty.call(content2.PACKS, m.pack))) r.pack = m.pack;
+      if (m.custom) { const c = cleanCustom(m.custom); if (c) r.custom = c; }
       if (m.deck === '24' || m.deck === '36' || m.deck === '52') r.deck = m.deck;
       if (typeof m.perevod === 'boolean') r.perevod = m.perevod;
       if (m.mode === 'normal' || m.mode === 'adult') { if (r.mode !== m.mode) r.topic = 'mix'; r.mode = m.mode; }

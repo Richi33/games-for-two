@@ -5,6 +5,7 @@ const rnd = n => (Math.random() * n) | 0;
 const shuffle = a => { for (let i = a.length - 1; i > 0; i--) { const j = rnd(i + 1);[a[i], a[j]] = [a[j], a[i]]; } return a; };
 const isInt = (x, lo, hi) => Number.isInteger(x) && x >= lo && x <= hi;
 const ERR_TURN = { error: 'Зараз не ваш хід' };
+const useOnly = (c, k) => !!(c && c.only && c[k] && c[k].length >= 3);
 const byScore = sc => (sc[0] > sc[1] ? 0 : sc[1] > sc[0] ? 1 : 'draw');
 
 // ---------- Що б обрав ти: обираєш 1 з 3, потім вгадуєш вибір суперника ----------
@@ -14,7 +15,8 @@ const wyr = {
     const pool = content.wyrPool(mode, o && o.topic);
     const items = [];
     pool.forEach(t => t.rows.forEach(r => items.push({ tn: t.e + ' ' + t.n, o: r })));
-    const rounds = shuffle(items).slice(0, pool.length === 1 ? items.length : 8);
+    const cu = (o && o.custom && o.custom.wyr) || [], mine = cu.map(x => ({ tn: '✍️ Свої', o: x.o }));
+    const rounds = useOnly(o && o.custom, 'wyr') ? shuffle(mine).slice(0, 8) : shuffle([...shuffle(mine).slice(0, 4), ...shuffle(items).slice(0, 8)]).slice(0, pool.length === 1 ? items.length : 8);
     return { rounds, r: 0, ph: 'pick', pick: [null, null], guess: [null, null], gain: [0, 0], score: [0, 0], winner: null };
   },
   move(s, p, m) {
@@ -53,7 +55,9 @@ const wyr = {
 const know = {
   init(o) {
     const pool = content.KNOW[o && o.mode === 'adult' ? 'adult' : 'normal'];
-    return { qs: shuffle([...pool]).slice(0, 12), r: 0, start: rnd(2), ph: 'ans', ans: null, guess: null, gain: 0, score: [0, 0], winner: null };
+    const cu = ((o && o.custom && o.custom.know) || []).map(x => ({ k: 't', q: x.q, o: x.o }));
+    const qs = useOnly(o && o.custom, 'know') ? shuffle(cu).slice(0, 12) : shuffle([...shuffle(cu).slice(0, 6), ...shuffle([...pool]).slice(0, 12)]).slice(0, 12);
+    return { qs, r: 0, start: rnd(2), ph: 'ans', ans: null, guess: null, gain: 0, score: [0, 0], winner: null };
   },
   move(s, p, m) {
     const subj = (s.start + s.r) % 2, q = s.qs[s.r];
@@ -92,8 +96,10 @@ const TURNS = 10;
 const tod = {
   init(o) {
     const pool = content.TOD[o && o.mode === 'adult' ? 'adult' : 'normal'];
+    const cu = (o && o.custom && o.custom.tod) || [], only = useOnly(o && o.custom, 'tod') && cu.filter(x => x.k === 't').length >= 3 && cu.filter(x => x.k === 'd').length >= 3;
+    const bag = k => { const mine = shuffle(cu.filter(x => x.k === k).map(x => x.t)); return only ? mine : [...shuffle([...pool[k]]), ...mine]; };   // власні беруться першими (pop з кінця)
     return { t: 0, turn: rnd(2), ph: 'choose', kind: null, prompt: null, done: [0, 0], skips: [0, 0],
-      bag: { t: shuffle([...pool.t]), d: shuffle([...pool.d]) }, winner: null };
+      bag: { t: bag('t'), d: bag('d') }, winner: null };
   },
   move(s, p, m) {
     const next = () => {
