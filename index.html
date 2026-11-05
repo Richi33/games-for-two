@@ -76,6 +76,8 @@ label.chk{display:flex;gap:10px;align-items:center;padding:8px 0}label.chk input
 .rules{margin:10px 0 14px;text-align:left;font-size:16px;line-height:1.45;font-weight:400}
 .rules-card{font-size:15px;line-height:1.45;margin-top:10px}
 .hbtns{display:flex;gap:2px}
+.serie{text-align:center;font-size:14px;color:var(--mu);margin:6px 0}.serie b{color:inherit}
+.hist{margin-top:8px;font-size:14px}.hist summary{cursor:pointer;color:var(--mu)}.hrow{background:var(--bg);border-radius:10px;padding:6px 10px;margin:4px 0}.hrow small{color:var(--mu)}
 </style>
 </head>
 <body>
@@ -109,6 +111,7 @@ function connect() {
     const m = JSON.parse(e.data);
     if (m.type === 'room') { const prev = S; S = m; localStorage.room = m.code; if (m.phase === 'play' && prev && prev.phase !== 'play') playStart(); render(); }
     else if (m.type === 'toast') toast(m.msg);
+    else if (window.onExtraMsg) onExtraMsg(m);
     else if (m.type === 'error') { toast(m.msg); if (m.fatal) { localStorage.removeItem('room'); S = null; render(); } }
   };
   ws.onclose = () => { $('#conn').textContent = '⚠ немає зв’язку…'; setTimeout(connect, 1500); };
@@ -257,6 +260,16 @@ function home() {
   <div class="card"><div class="muted" style="margin-bottom:8px">Або введіть код від друга</div>
   <div class="row"><input id="cd" type="text" maxlength="4" placeholder="КОД" value="${esc(q.toUpperCase())}" style="text-transform:uppercase;letter-spacing:4px;text-align:center"><button onclick="join()">Увійти</button></div></div>`;
 }
+function seriesHtml(full) {
+  const sr = S.series; if (!sr) return '';
+  const me = S.you, ot = 1 - me, n = sr.w[0] + sr.w[1] + sr.d;
+  if (!n) return full ? '<div class="muted" style="text-align:center;margin-top:8px">Рахунок вечора: 0 : 0 — ще не грали</div>' : '';
+  const line = `<div class="serie">🏅 Рахунок вечора: <b class="p${me}">${esc(S.names[me])} ${sr.w[me]}</b> : <b class="p${ot}">${sr.w[ot]} ${esc(S.names[ot] || '')}</b>${sr.d ? ` · нічиїх ${sr.d}` : ''}</div>`;
+  if (!full) return line;
+  const gn = id => { const g = GAMES.find(x => x.id === id); return g ? g.e + ' ' + g.n : id; };
+  const rows = sr.hist.slice(-8).reverse().map(h => `<div class="hrow">${gn(h.g)} — ${h.w === 'draw' ? 'нічия' : '🏆 ' + esc(S.names[h.w] || '?')}${h.p ? `<br><small>😈 ${esc(S.names[1 - h.w] || '?')}: ${esc(h.p)}</small>` : ''}</div>`).join('');
+  return line + `<details class="hist"><summary>Історія ігор і покарань (${sr.hist.length})</summary>${rows}</details>`;
+}
 function playersHtml() {
   return S.names.map((n, i) => `<div><span class="dot ${S.online[i] ? 'on' : ''}"></span><b class="p${i}">${n ? esc(n) : '— очікуємо гравця —'}</b>${i === S.you ? ' (ви)' : ''}</div>`).join('');
 }
@@ -264,7 +277,7 @@ function lobby() {
   const ready = S.online[0] && S.online[1];
   return `<div class="bar"><b>Кімната</b><span><button class="ghost" onclick="toggleSnd()" aria-label="Звук">${localStorage.snd === '0' ? '🔇' : '🔊'}</button><button class="ghost" onclick="leave()">Вийти ✕</button></span></div>
   <div class="card"><div class="muted" style="text-align:center">Код кімнати</div><div class="code">${S.code}</div>
-  <button class="primary" style="margin:0 0 10px" onclick="share()">🔗 Запросити друга</button>${playersHtml()}</div>
+  <button class="primary" style="margin:0 0 10px" onclick="share()">🔗 Запросити друга</button>${playersHtml()}${seriesHtml(true)}</div>
   <h3>Гра</h3><div class="games">${GAMES.map(g => `<button class="gbtn ${g.id === S.game ? 'on' : ''}" onclick="setS({game:'${g.id}'})"><b>${g.e} ${g.n}</b><span>${g.d}</span></button>`).join('')}</div>
   ${window.extraSettings ? extraSettings() : ''}
   <h3>Покарання</h3><div class="card">
@@ -293,6 +306,7 @@ function game() {
   }
   return `<div class="bar"><b>${g.e} ${g.n}</b><span class="hbtns"><button class="ghost xbtn" onclick="showRules()" aria-label="Правила">❓</button><button class="ghost xbtn" onclick="askMenu()" aria-label="В меню">🏠</button><button class="ghost xbtn" onclick="askLeave()" aria-label="Вийти">✕</button></span></div>
   <div class="bar"><div class="pl">${tag(S.you)}</div><div class="pl">${tag(1 - S.you)}</div></div>
+  ${seriesHtml(false)}
   ${S.withPun && S.punishment ? `<div class="badge">😈 Програвший: ${esc(S.punishment)}</div>` : ''}
   <div class="status">${r.st}</div><div id="board">${r.html}</div>${ban}`;
 }
@@ -331,5 +345,6 @@ render(); connect();
 <script src="/extra2.js"></script>
 <script src="/extra3.js"></script>
 <script src="/extra4.js"></script>
+<script src="/extra5.js"></script>
 </body>
 </html>
