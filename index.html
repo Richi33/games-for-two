@@ -143,6 +143,7 @@ document.addEventListener('pointerdown', audio, { once: true });
 // ---------- дії ----------
 function getName() { name = ($('#nm').value || '').trim() || 'Гравець'; localStorage.name = name; return name; }
 function create() { getName(); send({type:'create', name, token}); }
+function createBot() { getName(); send({type:'create', name, token, bot:true}); }
 function join() { getName(); const c = ($('#cd').value || '').trim().toUpperCase(); if (c.length < 4) return toast('Введіть код із 4 символів'); send({type:'join', code:c, name, token}); }
 function openModal(inner, onAct) {
   if (document.querySelector('.modal')) return;
@@ -257,8 +258,32 @@ function home() {
   return `<h1>🎮 Ігри на двох</h1>
   <div class="card"><input id="nm" type="text" maxlength="20" placeholder="Ваше ім’я" value="${esc(name)}">
   <button class="primary" onclick="create()">➕ Створити кімнату</button></div>
+  <div class="card"><button class="primary" style="margin:0" onclick="createBot()">🤖 Грати з ботом</button><div class="muted" style="margin-top:6px">Немає з ким грати? Бот вміє 12 ігор; друга людину можна запросити пізніше.</div></div>
   <div class="card"><div class="muted" style="margin-bottom:8px">Або введіть код від друга</div>
   <div class="row"><input id="cd" type="text" maxlength="4" placeholder="КОД" value="${esc(q.toUpperCase())}" style="text-transform:uppercase;letter-spacing:4px;text-align:center"><button onclick="join()">Увійти</button></div></div>`;
+}
+const gname = id => { const g = GAMES.find(x => x.id === id); return g ? g.e + ' ' + g.n : id; };
+window.marToggle = id => { const p = [...(S.marPick || [])], i = p.indexOf(id); if (i >= 0) p.splice(i, 1); else if (p.length < 6) p.push(id); setS({marathon: p}); };
+function marathonHtml() {
+  const pick = S.marPick || [], avail = GAMES.filter(g => !S.bot || (S.botGames || []).includes(g.id));
+  return `<h3>🏁 Марафон</h3><div class="card"><div class="muted">Оберіть 2–6 ігор по порядку: їх зіграєте поспіль із загальним рахунком. Колесо покарань (якщо ввімкнене) крутиться наприкінці для загального програвшого. Налаштування гри (складність, мова…) діють на весь марафон.</div>
+  <div class="chips">${avail.map(g => { const i = pick.indexOf(g.id); return `<button class="chip ${i >= 0 ? 'on' : ''}" onclick="marToggle('${g.id}')">${i >= 0 ? (i + 1) + '. ' : ''}${g.e} ${esc(g.n)}</button>`; }).join('')}</div>
+  ${pick.length ? `<div class="muted">${pick.length < 2 ? 'Оберіть ще хоча б одну гру' : 'Порядок: ' + pick.map(gname).join(' → ')}</div><button class="ghost" onclick="setS({marathon:[]})">Очистити вибір</button>` : ''}</div>`;
+}
+function marBar() {
+  const m = S.mar; if (!m) return '';
+  const me = S.you, ot = 1 - me;
+  return `<div class="serie">🏁 Марафон ${m.idx + 1}/${m.games.length} · <b class="p${me}">${esc(S.names[me])} ${m.w[me]}</b> : <b class="p${ot}">${m.w[ot]} ${esc(S.names[ot] || '')}</b>${m.d ? ` · нічиїх ${m.d}` : ''}</div>`;
+}
+function marOver() {
+  const m = S.mar, me = S.you, ot = 1 - me, a = m.w[me], b = m.w[ot];
+  const cls = a > b ? 'win' : a < b ? 'lose' : 'draw', title = a > b ? '🏆 Ви виграли марафон!' : a < b ? '😔 Марафон за суперником' : '🤝 Марафон — нічия!';
+  const loser = a < b ? me : b < a ? ot : null;
+  const rows = m.res.map((r, i) => `<div class="hrow">${i + 1}. ${gname(r.g)} — ${r.w === 'draw' ? 'нічия' : '🏆 ' + esc(S.names[r.w] || '?')}</div>`).join('');
+  return `<div class="bar"><b>🏁 Підсумок марафону</b><span class="hbtns"><button class="ghost xbtn" onclick="askLeave()" aria-label="Вийти">✕</button></span></div>
+  <div class="banner ${cls}"><h2>${title}</h2><div class="big" style="margin:4px 0">${esc(S.names[me])} ${a} : ${b} ${esc(S.names[ot] || '')}${m.d ? ` · нічиїх ${m.d}` : ''}</div>
+  ${S.withPun && S.punishment && loser !== null ? `<div>😈 <b>${esc(S.names[loser])}</b> виконує: <b>${esc(S.punishment)}</b></div>` : ''}
+  <div class="endbtns"><button class="primary" onclick="send({type:'again'})">🏠 В лобі</button></div></div>${rows}`;
 }
 function seriesHtml(full) {
   const sr = S.series; if (!sr) return '';
@@ -274,12 +299,13 @@ function playersHtml() {
   return S.names.map((n, i) => `<div><span class="dot ${S.online[i] ? 'on' : ''}"></span><b class="p${i}">${n ? esc(n) : '— очікуємо гравця —'}</b>${i === S.you ? ' (ви)' : ''}</div>`).join('');
 }
 function lobby() {
-  const ready = S.online[0] && S.online[1];
+  const ready = S.online[0] && S.online[1], mara = (S.marPick || []).length >= 2, noBot = S.bot && !mara && !(S.botGames || []).includes(S.game);
   return `<div class="bar"><b>Кімната</b><span><button class="ghost" onclick="toggleSnd()" aria-label="Звук">${localStorage.snd === '0' ? '🔇' : '🔊'}</button><button class="ghost" onclick="leave()">Вийти ✕</button></span></div>
   <div class="card"><div class="muted" style="text-align:center">Код кімнати</div><div class="code">${S.code}</div>
-  <button class="primary" style="margin:0 0 10px" onclick="share()">🔗 Запросити друга</button>${playersHtml()}${seriesHtml(true)}</div>
+  <button class="primary" style="margin:0 0 10px" onclick="share()">🔗 Запросити друга</button>${playersHtml()}${S.bot ? '<button class="ghost" onclick="send({type:\'unbot\'})">👥 Замінити бота живою людиною</button>' : ''}${seriesHtml(true)}</div>
   <h3>Гра</h3><div class="games">${GAMES.map(g => `<button class="gbtn ${g.id === S.game ? 'on' : ''}" onclick="setS({game:'${g.id}'})"><b>${g.e} ${g.n}</b><span>${g.d}</span></button>`).join('')}</div>
   ${window.extraSettings ? extraSettings() : ''}
+  ${marathonHtml()}
   <h3>Покарання</h3><div class="card">
   <label class="chk"><input type="checkbox" ${S.withPun ? 'checked' : ''} onchange="setS({withPun:this.checked})"> З покаранням для того, хто програє</label>
   ${S.withPun ? `<div class="muted">Перед грою колесо вибере покарання — його побачать обоє.</div>
@@ -287,7 +313,7 @@ function lobby() {
    ${S.puns.map((p, i) => `<div class="pun"><span>${esc(p)}</span><button onclick="delPun(${i})">✕</button></div>`).join('')}
    <div class="row" style="margin-top:8px"><input id="np" type="text" maxlength="60" placeholder="Нове покарання…" onkeydown="if(event.key==='Enter')addPun()"><button onclick="addPun()">＋</button></div>
    <button class="ghost" onclick="setS({puns:DEFAULT_PUNS})">Скинути до стандартних</button>` : ''}</div>
-  <button class="primary" ${ready ? '' : 'disabled'} onclick="send({type:'start'})">${ready ? '▶ Почати гру' : 'Чекаємо другого гравця…'}</button>`;
+  <button class="primary" ${ready && !noBot ? '' : 'disabled'} onclick="send({type:'start'})">${!ready ? 'Чекаємо другого гравця…' : noBot ? '🤖 Бот ще не вміє цю гру' : mara ? `🏁 Почати марафон (${S.marPick.length} ігор)` : '▶ Почати гру'}</button>`;
 }
 function wheelScreen() {
   return `<div class="bar"><span></span><span class="hbtns"><button class="ghost xbtn" onclick="askMenu()" aria-label="В меню">🏠</button><button class="ghost xbtn" onclick="askLeave()" aria-label="Вийти">✕</button></span></div><h1>🎡 Колесо покарань</h1><div class="muted" style="text-align:center">Покарання для того, хто програє:</div>
@@ -302,11 +328,14 @@ function game() {
     const cls = w === 'draw' ? 'draw' : me ? 'win' : 'lose';
     const title = w === 'draw' ? '🤝 Нічия!' : me ? '🏆 Ви перемогли!' : '😔 Ви програли';
     const pun = S.withPun && S.punishment && w !== 'draw' ? `<div>😈 <b>${esc(S.names[1 - w])}</b> виконує: <b>${esc(S.punishment)}</b></div>` : '';
-    ban = `<div class="banner ${cls}"><h2>${title}</h2>${pun}<div class="endbtns"><button class="primary" onclick="send({type:'restart'})">🔁 Почати заново</button><button onclick="send({type:'again'})">🏠 В меню</button></div></div>`;
+    const btns = S.mar
+      ? `<button class="primary" onclick="send({type:'next'})">${S.mar.idx + 1 >= S.mar.games.length ? '🏁 Підсумок марафону' : '➜ Далі: ' + gname(S.mar.games[S.mar.idx + 1])}</button>`
+      : `<button class="primary" onclick="send({type:'restart'})">🔁 Почати заново</button><button onclick="send({type:'again'})">🏠 В меню</button>`;
+    ban = `<div class="banner ${cls}"><h2>${title}</h2>${pun}<div class="endbtns">${btns}</div></div>`;
   }
   return `<div class="bar"><b>${g.e} ${g.n}</b><span class="hbtns"><button class="ghost xbtn" onclick="showRules()" aria-label="Правила">❓</button><button class="ghost xbtn" onclick="askMenu()" aria-label="В меню">🏠</button><button class="ghost xbtn" onclick="askLeave()" aria-label="Вийти">✕</button></span></div>
   <div class="bar"><div class="pl">${tag(S.you)}</div><div class="pl">${tag(1 - S.you)}</div></div>
-  ${seriesHtml(false)}
+  ${S.mar ? marBar() : seriesHtml(false)}
   ${S.withPun && S.punishment ? `<div class="badge">😈 Програвший: ${esc(S.punishment)}</div>` : ''}
   <div class="status">${r.st}</div><div id="board">${r.html}</div>${ban}`;
 }
@@ -319,6 +348,7 @@ function render() {
   if (!S) h = home();
   else if (S.phase === 'lobby') h = lobby();
   else if (S.phase === 'wheel') h = wheelScreen();
+  else if (S.phase === 'mover') h = marOver();
   else h = game();
   $('#app').innerHTML = h;
   for (const id in keep) { const el = document.getElementById(id); if (el && (id === 'np' || id === 'gn' || id === 'dv' || id === 'cu') && (!el.dataset.ctx || el.dataset.ctx === keep[id][1])) { el.value = keep[id][0]; if (act === id) el.focus(); } }
