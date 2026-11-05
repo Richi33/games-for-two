@@ -5,12 +5,15 @@ const { WebSocketServer } = require('ws');
 const games = require('./games');
 const content = require('./content');
 const content2 = require('./content2');
+const bots = require('./bots');
 
 const PORT = process.env.PORT || 3000;
 const STATIC = {
   '/': ['index.html', 'text/html; charset=utf-8'],
   '/index.html': ['index.html', 'text/html; charset=utf-8'],
   '/sw.js': ['sw.js', 'text/javascript'],
+  '/app.js': ['app.js', 'text/javascript'],
+  '/style.css': ['style.css', 'text/css; charset=utf-8'],
   '/extra.js': ['extra.js', 'text/javascript'],
   '/extra2.js': ['extra2.js', 'text/javascript'],
   '/rules.js': ['rules.js', 'text/javascript'],
@@ -21,8 +24,13 @@ const STATIC = {
   '/manifest.webmanifest': ['manifest.webmanifest', 'application/manifest+json'],
   '/icon-192.png': ['icon-192.png', 'image/png'],
   '/icon-512.png': ['icon-512.png', 'image/png'],
+  '/icon-180.png': ['icon-180.png', 'image/png'],
+  '/icon-maskable-512.png': ['icon-maskable-512.png', 'image/png'],
+  '/favicon.svg': ['favicon.svg', 'image/svg+xml'],
+  '/offline.html': ['offline.html', 'text/html; charset=utf-8'],
 };
 const server = http.createServer((req, res) => {
+  if (req.url === '/healthz') { res.writeHead(200, { 'Content-Type': 'text/plain' }); return res.end('ok'); }
   const hit = STATIC[req.url.split('?')[0]];
   if (!hit) { res.writeHead(404); return res.end('404'); }
   fs.readFile(path.join(__dirname, hit[0]), (e, d) => {
@@ -45,17 +53,28 @@ function newCode() {
 const clearTimers = r => { r.timers.forEach(clearTimeout); r.timers.clear(); };
 const send = (ws, o) => { if (ws && ws.readyState === 1) ws.send(JSON.stringify(o)); };
 
+const isOn = p => !!(p && (p.ws || p.bot));
 function snapshot(r, i) {
   const playing = r.state && (r.phase === 'play' || r.phase === 'over');
   return {
     type: 'room', code: r.code, you: i,
-    names: r.players.map(p => p && p.name), online: r.players.map(p => !!(p && p.ws)),
+    names: r.players.map(p => p && p.name), online: r.players.map(isOn), bot: !!r.bot, botGames: r.bot ? bots.SUPPORTED : undefined, mar: r.mar, marPick: r.marPick,
     game: r.game, diff: r.diff, deck: r.deck, perevod: r.perevod, lang: r.lang, len: r.len, daily: r.daily, mode: r.mode, topic: r.topic, pack: r.pack, packs: r.phase === 'lobby' ? content2.PACK_LIST : undefined, custom: r.custom, topics: r.phase === 'lobby' ? content.topicsFor(r.mode) : undefined, withPun: r.withPun, puns: r.puns, phase: r.phase, wheel: r.wheel, punishment: r.punishment,
     winner: r.state ? r.state.winner : null, series: r.series,
     view: playing ? games[r.game].view(r.state, i) : null,
   };
 }
-function broadcast(r) { r.players.forEach((p, i) => p && send(p.ws, snapshot(r, i))); }
+function broadcast(r) { r.players.forEach((p, i) => p && send(p.ws, snapshot(r, i))); if (r.bot) botAct(r); }
+function botAct(r) {                                      // бот (гравець №1) думає й ходить із затримкою
+  if (r.botT || r.phase !== 'play' || !r.state) return;
+  const th = bots.think(r.game, r.state, r.botCtx || (r.botCtx = {}), r.diff), st = r.state;
+  if (!th) return;
+  r.botT = setTimeout(() => {
+    r.botT = null;
+    if (r.phase !== 'play' || r.state !== st) return;
+    if (th.msg) { games[r.game].move(r.state, bots.BOT, th.msg, sched(r)); check(r); broadcast(r); } else botAct(r);
+  }, th.msg ? th.delay : th.retry);
+}
 
 function sched(r) {
   return (ms, fn) => {
@@ -89,18 +108,39 @@ function check(r) {
   if (w === 'draw') S.d++; else S.w[w]++;
   S.hist.push({ g: r.game, w, p: r.withPun && r.punishment && w !== 'draw' ? r.punishment : null });
   if (S.hist.length > 30) S.hist.shift();
+  if (r.mar) { if (w === 'draw') r.mar.d++; else r.mar.w[w]++; r.mar.res.push({ g: r.game, w }); }      // підсумок марафону
 }
 
 function begin(r) {
   const g = games[r.game];
-  r.state = g.init({ diff: r.diff, deck: r.deck, perevod: r.perevod, lang: r.lang, len: r.len, daily: r.daily, mode: r.mode, topic: r.topic, pack: r.pack, custom: r.custom }); r.phase = 'play';
+  r.botCtx = {}; r.state = g.init({ diff: r.diff, deck: r.deck, perevod: r.perevod, lang: r.lang, len: r.len, daily: r.daily, mode: r.mode, topic: r.topic, pack: r.pack, custom: r.custom }); r.phase = 'play';
   if (g.start) g.start(r.state, sched(r));
   broadcast(r);
 }
+function finishMarathon(r) {
+  r.mar.done = true; clearTimers(r);
+  const [a, b] = r.mar.w;
+  if (r.withPun && a !== b && r.puns.length >= 2) {            // колесо крутиться в кінці — для загального програвшого
+    const target = rnd(r.puns.length);
+    r.wheel = { target, turns: 5 + rnd(4), seq: Date.now() };
+    r.punishment = r.puns[target]; r.phase = 'wheel'; r.state = null;
+    const t = setTimeout(() => { r.timers.delete(t); if (r.phase === 'wheel') { r.phase = 'mover'; broadcast(r); } }, 6800);
+    r.timers.add(t);
+  } else { r.phase = 'mover'; r.state = null; }
+  broadcast(r);
+}
 function startGame(r, ws) {
-  if (!r.players[0] || !r.players[1] || !r.players[0].ws || !r.players[1].ws) return send(ws, { type: 'error', msg: 'Потрібні двоє гравців онлайн' });
+  if (!isOn(r.players[0]) || !isOn(r.players[1])) return send(ws, { type: 'error', msg: 'Потрібні двоє гравців онлайн' });
   if (r.withPun && r.puns.length < 2) return send(ws, { type: 'error', msg: 'Додайте щонайменше 2 покарання' });
+  const mara = r.phase === 'lobby' && r.marPick.length >= 2;
+  const list = mara ? r.marPick : [r.game];
+  if (r.bot && list.some(g => !bots.SUPPORTED.includes(g))) return send(ws, { type: 'error', msg: '🤖 Бот ще не вміє цю гру' });
   clearTimers(r);
+  if (mara) {                                                  // марафон: колеса перед іграми немає
+    r.mar = { games: [...r.marPick], idx: 0, w: [0, 0], d: 0, res: [], done: false };
+    r.game = r.mar.games[0]; r.wheel = null; r.punishment = null;
+    return begin(r);
+  }
   if (r.withPun) {
     const target = rnd(r.puns.length);
     r.wheel = { target, turns: 5 + rnd(4), seq: Date.now() };
@@ -112,7 +152,7 @@ function startGame(r, ws) {
   r.wheel = null; r.punishment = null;
   return begin(r);
 }
-function toLobby(r) { clearTimers(r); r.phase = 'lobby'; r.state = null; r.wheel = null; r.punishment = null; }
+function toLobby(r) { clearTimers(r); clearTimeout(r.botT); r.botT = null; r.mar = null; r.phase = 'lobby'; r.state = null; r.wheel = null; r.punishment = null; }
 
 function cleanPuns(a) {
   if (!Array.isArray(a)) return null;
@@ -122,10 +162,11 @@ function cleanPuns(a) {
 function handle(ws, m) {
   if (m.type === 'create') {
     const code = newCode();
-    const r = { code, players: [null, null], game: 'ttt', diff: 'normal', deck: '36', perevod: true, lang: 'uk', len: 5, daily: false, pack: 'mix', custom: emptyCustom(), mode: 'normal', topic: 'mix', withPun: false, puns: [...DEFAULT_PUNS], phase: 'lobby', state: null, wheel: null, punishment: null, timers: new Set(), series: newSeries(), chat: [] };
+    const r = { code, players: [null, null], game: 'ttt', diff: 'normal', deck: '36', perevod: true, lang: 'uk', len: 5, daily: false, pack: 'mix', custom: emptyCustom(), mode: 'normal', topic: 'mix', withPun: false, puns: [...DEFAULT_PUNS], phase: 'lobby', state: null, wheel: null, punishment: null, timers: new Set(), series: newSeries(), chat: [], bot: false, marPick: [], mar: null };
     rooms.set(code, r);
     ws.room = r; ws.idx = 0; ws.token = String(m.token || '');
     r.players[0] = { ws, name: String(m.name || 'Гравець').slice(0, 20), token: ws.token };
+    if (m.bot === true) { r.bot = true; r.players[1] = { ws: null, bot: true, name: '🤖 Бот', token: 'bot-' + code }; }
     return broadcast(r);
   }
   if (m.type === 'join') {
@@ -153,6 +194,10 @@ function handle(ws, m) {
       if (['easy', 'normal', 'hard'].includes(m.diff)) r.diff = m.diff;
       if (m.lang === 'uk' || m.lang === 'ru') r.lang = m.lang;
       if (Number.isInteger(m.len) && m.len >= 5 && m.len <= 8) r.len = m.len;
+      if (Array.isArray(m.marathon)) {
+        const ok = g => typeof g === 'string' && Object.prototype.hasOwnProperty.call(games, g) && (!r.bot || bots.SUPPORTED.includes(g));
+        r.marPick = [...new Set(m.marathon.filter(ok))].slice(0, 6);
+      }
       if (typeof m.daily === 'boolean') r.daily = m.daily;
       if (m.pack === 'mix' || (typeof m.pack === 'string' && Object.prototype.hasOwnProperty.call(content2.PACKS, m.pack))) r.pack = m.pack;
       if (m.custom) { const c = cleanCustom(m.custom); if (c) r.custom = c; }
@@ -167,7 +212,7 @@ function handle(ws, m) {
       if (r.phase !== 'lobby') return;
       return startGame(r, ws);
     case 'restart':                      // «Почати заново» після гри: та сама гра й налаштування
-      if (r.phase !== 'over') return;
+      if (r.phase !== 'over' || r.mar) return;
       return startGame(r, ws);
     case 'move': {
       if (r.phase !== 'play') return;
@@ -181,8 +226,15 @@ function handle(ws, m) {
       r.players.forEach((p, k) => { if (p && k !== i) send(p.ws, { type: 'toast', msg: (r.players[i] ? r.players[i].name : 'Суперник') + ' повернувся в меню' }); });
       return broadcast(r);
     case 'again':
-      if (r.phase === 'over') { toLobby(r); broadcast(r); }
+      if (r.phase === 'over' || r.phase === 'mover') { toLobby(r); broadcast(r); }
       return;
+    case 'next':                         // марафон: наступна гра або підсумок
+      if (!r.mar || r.phase !== 'over') return;
+      if (r.mar.idx + 1 < r.mar.games.length) { r.mar.idx++; r.game = r.mar.games[r.mar.idx]; clearTimers(r); return begin(r); }
+      return finishMarathon(r);
+    case 'unbot':                        // замінити бота живою людиною
+      if (!r.bot || r.phase !== 'lobby') return;
+      r.bot = false; r.players[1] = null; r.series = newSeries(); r.chat = []; return broadcast(r);
     case 'react': {
       if (!REACTS.includes(m.e)) return;
       r.players.forEach(p => p && send(p.ws, { type: 'react', from: i, e: m.e })); return;
@@ -196,6 +248,7 @@ function handle(ws, m) {
       r.players.forEach(p => p && send(p.ws, { type: 'chat', ...msg })); return;
     }
     case 'leave':
+      if (r.bot) { clearTimers(r); clearTimeout(r.botT); rooms.delete(r.code); ws.room = null; return; }
       r.players[i] = null; ws.room = null; r.series = newSeries(); r.chat = [];
       if (!r.players[0] && !r.players[1]) { clearTimers(r); rooms.delete(r.code); }
       else { toLobby(r); broadcast(r); }
@@ -214,7 +267,7 @@ wss.on('connection', ws => {
     const p = r.players[ws.idx];
     if (p && p.ws === ws) { p.ws = null; broadcast(r); }
     if (r.players.every(x => !x || !x.ws)) {
-      r.dead = setTimeout(() => { if (r.players.every(x => !x || !x.ws)) { clearTimers(r); rooms.delete(r.code); } }, 15 * 60 * 1000);
+      r.dead = setTimeout(() => { if (r.players.every(x => !x || !x.ws)) { clearTimers(r); clearTimeout(r.botT); rooms.delete(r.code); } }, 15 * 60 * 1000);
     }
   });
 });

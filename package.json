@@ -1,9 +1,16 @@
 {
   "name": "games-for-two",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Ігри на двох онлайн (PWA) з колесом покарань",
   "main": "server.js",
-  "scripts": { "start": "node server.js" },
-  "engines": { "node": ">=18" },
-  "dependencies": { "ws": "^8.18.0" }
+  "scripts": {
+    "start": "node server.js",
+    "test": "node --test"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "ws": "^8.18.0"
+  }
 }

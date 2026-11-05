@@ -60,6 +60,12 @@ const wordle = {
       done: s.done[p], oppDone: s.done[o], word: over ? s.word : null,
     };
   },
+  bot(s, p, skill) {                          // хід бота: слово, сумісне з усіма попередніми підказками
+    const pool = dict(s.lang).answers[s.len];
+    let c = pool.filter(w => s.g[p].every((g, i) => wscore(g, w) === s.res[p][i]));
+    if (!c.length || Math.random() > skill + 0.25) c = pool;
+    return c[rnd(c.length)];
+  },
   stats() { return { uk: dict('uk').words.size, ru: dict('ru').words.size }; },
   score: wscore,
 };

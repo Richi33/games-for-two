@@ -29,6 +29,10 @@
   window.extraSettings = function () {
     const g = S.game; let h = '';
     const btn = (on, fn, label, sub) => `<button class="gbtn ${on ? 'on' : ''}" onclick="${fn}"><b>${label}</b>${sub ? `<span>${sub}</span>` : ''}</button>`;
+    if (S.bot && g !== 'mem' && g !== 'hang') {
+      h += `<div class="muted">Сила бота</div><div class="games" style="grid-template-columns:repeat(3,1fr)">`
+        + [['easy', '🟢 Легко'], ['normal', '🟡 Звичайно'], ['hard', '🔴 Складно']].map(([k, l]) => btn(S.diff === k, `setS({diff:'${k}'})`, l, '')).join('') + `</div>`;
+    }
     if (g === 'mem' || g === 'hang') {
       const desc = g === 'mem'
         ? { easy: '12 карток, довго видно', normal: '16 карток', hard: '24 картки, швидко ховаються' }

@@ -1,14 +1,19 @@
 {
+  "id": "/",
   "name": "Ігри на двох",
   "short_name": "Ігри на двох",
-  "description": "Настільні та інтелектуальні ігри для двох онлайн з колесом покарань",
+  "description": "Онлайн-ігри для двох: настільні, словесні, карткові, з колесом покарань, чатом і ботом",
+  "lang": "uk",
   "start_url": "/",
+  "scope": "/",
   "display": "standalone",
-  "orientation": "portrait",
+  "orientation": "any",
   "background_color": "#1b1d2a",
   "theme_color": "#1b1d2a",
+  "categories": ["games", "entertainment"],
   "icons": [
-    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
-    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
   ]
 }
