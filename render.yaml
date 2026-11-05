@@ -1,0 +1,10 @@
+# Render Blueprint: New → Blueprint → оберіть репозиторій. Деплой автоматично після кожного пушу в main.
+services:
+  - type: web
+    name: games-for-two
+    runtime: node
+    plan: free
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /healthz
+    autoDeploy: true

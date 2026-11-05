@@ -12,6 +12,8 @@ const STATIC = {
   '/': ['index.html', 'text/html; charset=utf-8'],
   '/index.html': ['index.html', 'text/html; charset=utf-8'],
   '/sw.js': ['sw.js', 'text/javascript'],
+  '/app.js': ['app.js', 'text/javascript'],
+  '/style.css': ['style.css', 'text/css; charset=utf-8'],
   '/extra.js': ['extra.js', 'text/javascript'],
   '/extra2.js': ['extra2.js', 'text/javascript'],
   '/rules.js': ['rules.js', 'text/javascript'],
@@ -28,6 +30,7 @@ const STATIC = {
   '/offline.html': ['offline.html', 'text/html; charset=utf-8'],
 };
 const server = http.createServer((req, res) => {
+  if (req.url === '/healthz') { res.writeHead(200, { 'Content-Type': 'text/plain' }); return res.end('ok'); }
   const hit = STATIC[req.url.split('?')[0]];
   if (!hit) { res.writeHead(404); return res.end('404'); }
   fs.readFile(path.join(__dirname, hit[0]), (e, d) => {

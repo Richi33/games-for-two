@@ -72,6 +72,20 @@ npm start          # http://localhost:3000
 - Android (Chrome): меню ⋮ → «Установити застосунок».
 - iPhone (Safari): «Поділитися» → «На початковий екран».
 
+## Тести та CI
+```bash
+npm install
+npm test        # логіка всіх ігор, бот, Wordle-словники + інтеграційні тести сервера (WebSocket)
+```
+GitHub Actions (`.github/workflows/ci.yml`) запускає тести на Node 18/20/22 для кожного PR і пушу в `main`.
+
+## Автодеплой
+- **Render Blueprint** (`render.yaml`): Render → New → Blueprint → оберіть репозиторій; далі кожен мердж у `main` деплоїться автоматично (health-check `/healthz`).
+- Якщо сервіс уже створено вручну — або ввімкніть там Auto-Deploy, або додайте секрет `RENDER_DEPLOY_HOOK_URL` (Deploy Hook із Render): тоді `.github/workflows/deploy.yml` запускає деплой після успішного CI.
+
+## Структура клієнта
+`index.html` (каркас) · `style.css` · `app.js` (ядро: мережа, лобі, колесо, рендер) · `extra*.js` (інтерфейси ігор, налаштування, чат, свої матеріали) · `rules.js`.
+
 ## Додати нову гру
 У `games3.js` (або `games2.js` / `games.js`) додайте об'єкт `{ init, move, view }` (+ необов'язковий `start`), експортуйте його;
 у `extra2.js` додайте запис у `GAMES` і функцію відображення `R.<id>`, а короткі правила — у `rules.js`.

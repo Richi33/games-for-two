@@ -1,0 +1,19 @@
+# Автодеплой після мерджу в main: додайте в Settings → Secrets → Actions секрет RENDER_DEPLOY_HOOK_URL
+# (Render → сервіс → Settings → Deploy Hook). Якщо Render підключений до репозиторію з autoDeploy, цей workflow не потрібен.
+name: Deploy
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+jobs:
+  render:
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Тригер деплою на Render
+        env:
+          HOOK: ${{ secrets.RENDER_DEPLOY_HOOK_URL }}
+        run: |
+          if [ -z "$HOOK" ]; then echo "RENDER_DEPLOY_HOOK_URL не задано — пропускаю"; exit 0; fi
+          curl -fsS -X POST "$HOOK"
