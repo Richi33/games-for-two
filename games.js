@@ -177,3 +177,4 @@ Object.assign(module.exports, require('./games2'));
 Object.assign(module.exports, require('./games3'));
 Object.assign(module.exports, require('./games4'));
 Object.assign(module.exports, require('./games5'));
+Object.assign(module.exports, require('./games6'));

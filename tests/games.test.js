@@ -17,7 +17,7 @@ test('кожна гра має init/move/view і правила; клієнт з
     for (const f of ['init', 'move', 'view']) assert.equal(typeof G[id][f], 'function', `${id}.${f}`);
     assert.ok(sandbox.window.RULES[id], 'немає правил для ' + id);
   }
-  const client = ['app.js', 'extra.js', 'extra2.js', 'extra3.js', 'extra4.js'].map(read).join('\n');
+  const client = ['app.js', 'extra.js', 'extra2.js', 'extra3.js', 'extra4.js', 'extra7.js'].map(read).join('\n');
   const found = new Set([...client.matchAll(/\{\s*id:\s*'([a-z]+)'\s*,\s*e:/g)].map(m => m[1]));
   for (const id of ids) assert.ok(found.has(id), 'у клієнті немає гри ' + id);
 });
@@ -110,6 +110,29 @@ test('Дурень: 300 випадкових партій без помилок 
   }
 });
 
+test('Фортуна: ходи по черзі, різні варіанти, бали за імовірністю, 500 партій', () => {
+  const L = G.luck, seen = new Set();
+  for (let t = 0; t < 500; t++) {
+    const s = L.init(); let guard = 0;
+    while (s.winner == null && guard++ < 100) {
+      if (s.ph === 'pick') {
+        seen.add(s.ev.id);
+        const p = L.view(s, 0).turn, free = s.ev.opts.map(o => o.id).filter(i => !s.pick.includes(i));
+        assert.ok(L.move(s, 1 - p, { a: 'pick', o: free[0] }).error, 'ходить не той гравець');
+        assert.ok(L.move(s, p, { a: 'pick', o: 99 }).error);
+        assert.ok(!L.move(s, p, { a: 'pick', o: free[rnd(free.length)] }).error);
+        if (s.ph === 'pick') { const q = L.view(s, 0).turn; assert.ok(L.move(s, q, { a: 'pick', o: s.pick[p] }).error, 'той самий варіант'); assert.ok(!L.move(s, q, { a: 'pick', o: s.ev.opts.map(o => o.id).filter(i => !s.pick.includes(i))[0] }).error); }
+        assert.equal(L.view(s, 0).out, null === 1 ? 0 : L.view(s, 0).out);
+      } else { const v = L.view(s, 1); assert.ok(v.out && v.gain); L.move(s, 0, { a: 'next' }); }
+    }
+    assert.ok(s.winner != null);
+    assert.equal(s.score[0] + s.score[1], s.hist.reduce((a, h) => a + (h.by === null ? 0 : h.pts), 0));
+  }
+  assert.ok(seen.size >= 8, 'усі види подій трапляються: ' + [...seen]);
+  // результат не видно до того, як обидва зробили вибір
+  const s = L.init(); const v = L.view(s, 0); assert.equal(v.out, null); assert.ok(!JSON.stringify(v).includes('"roll"'));
+});
+
 test('Бот грає в усі підтримувані ігри без помилок і партії завершуються', () => {
   assert.ok(bots.SUPPORTED.length >= 12);
   for (const g of bots.SUPPORTED.filter(x => !['react', 'wordle'].includes(x))) {
@@ -140,5 +163,6 @@ function humanMove(g, s) {
   if (g === 'hang' && s.turn === 0) { const ls = [...'абвгдеєжзиіїйклмнопрстуфхцчшщьюя'].filter(l => !s.g.some(x => x.l === l)); return { l: ls[0] }; }
   if (g === 'chk' && s.turn === 0) { const lg = G.chk.view(s, 0).legal; return lg.length ? { from: lg[0][0], to: lg[0][1] } : null; }
   if (g === 'bj' && s.turn === 0) return { a: 'stand' };
+  if (g === 'luck') { if (s.ph === 'result') return { a: 'next' }; const t = s.pick[s.first] === null ? s.first : 1 - s.first; return t === 0 ? { a: 'pick', o: s.ev.opts.map(o => o.id).find(i => !s.pick.includes(i)) } : null; }
   return null;
 }

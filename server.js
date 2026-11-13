@@ -21,6 +21,7 @@ const STATIC = {
   '/extra4.js': ['extra4.js', 'text/javascript'],
   '/extra5.js': ['extra5.js', 'text/javascript'],
   '/extra6.js': ['extra6.js', 'text/javascript'],
+  '/extra7.js': ['extra7.js', 'text/javascript'],
   '/manifest.webmanifest': ['manifest.webmanifest', 'application/manifest+json'],
   '/icon-192.png': ['icon-192.png', 'image/png'],
   '/icon-512.png': ['icon-512.png', 'image/png'],

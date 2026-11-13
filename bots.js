@@ -125,6 +125,13 @@ const T = {
     if (s.phase !== 'go') return null;
     return { msg: { c: 1 }, delay: between(Math.round(700 - 400 * skill), Math.round(1300 - 500 * skill)) };
   },
+  luck(s) {                                   // бот обирає вільний варіант випадково (ставки в цій грі «чесні»)
+    if (s.ph !== 'pick') return null;
+    const turn = s.pick[s.first] === null ? s.first : 1 - s.first;
+    if (turn !== BOT) return null;
+    const free = s.ev.opts.map(o => o.id).filter(i => !s.pick.includes(i));
+    return { msg: { a: 'pick', o: pick(free) }, delay: between(900, 1800) };
+  },
   bj(s, ctx, skill) {
     if (s.turn !== BOT || s.winner != null) return null;
     const sum = s.h[BOT].reduce((a, c) => a + c.v, 0), lim = skill > .8 ? 17 : skill > .5 ? 16 : 14;
