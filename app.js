@@ -25,12 +25,14 @@ const MARK = {ttt:['✕','○'],dots:['🟦','🟥']};
 const DEFAULT_PUNS = ['10 присідань','Заспівати уривок пісні','Розповісти жарт','Зробити комплімент переможцю','Танцювати 30 секунд','Масаж плечей 1 хвилину','Розповісти секрет','Принести переможцю напій'];
 
 let S = null, ws = null, runSeq = null, name = localStorage.name || '';
+const newPid = () => Array.from(crypto.getRandomValues(new Uint8Array(16)), b => b.toString(16).padStart(2, '0')).join('');
+let pid = localStorage.gft_pid; if (!/^[a-f0-9]{32}$/.test(pid || '')) localStorage.gft_pid = pid = newPid();
 let token = localStorage.token || (localStorage.token = Math.random().toString(36).slice(2) + Date.now().toString(36));
 
 // ---------- мережа ----------
 function connect() {
   ws = new WebSocket((location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host);
-  ws.onopen = () => { $('#conn').textContent = ''; const c = localStorage.room; if (c && name) send({type:'join', code:c, name, token}); };
+  ws.onopen = () => { $('#conn').textContent = ''; send({type:'hello', pid, name}); const c = localStorage.room; if (c && name) send({type:'join', code:c, name, token}); };
   ws.onmessage = e => {
     const m = JSON.parse(e.data);
     if (m.type === 'room') { const prev = S; S = m; localStorage.room = m.code; if (m.phase === 'play' && prev && prev.phase !== 'play') playStart(); render(); }

@@ -17,7 +17,7 @@ test('кожна гра має init/move/view і правила; клієнт з
     for (const f of ['init', 'move', 'view']) assert.equal(typeof G[id][f], 'function', `${id}.${f}`);
     assert.ok(sandbox.window.RULES[id], 'немає правил для ' + id);
   }
-  const client = ['app.js', 'extra.js', 'extra2.js', 'extra3.js', 'extra4.js', 'extra7.js'].map(read).join('\n');
+  const client = ['app.js', 'extra.js', 'extra2.js', 'extra3.js', 'extra4.js', 'extra7.js', 'extra8.js'].map(read).join('\n');
   const found = new Set([...client.matchAll(/\{\s*id:\s*'([a-z]+)'\s*,\s*e:/g)].map(m => m[1]));
   for (const id of ids) assert.ok(found.has(id), 'у клієнті немає гри ' + id);
 });
