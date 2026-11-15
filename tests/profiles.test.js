@@ -112,3 +112,65 @@ test('WS: hello → профіль, гра → нагорода, відновл�
     [a, b, c].forEach(x => x.ws.close());
   } finally { srv.kill(); }
 });
+
+test('магазин і скіли: купівля, списання, ефекти нагород', async () => {
+  profiles._setStore(fileStore(tmp()));
+  await profiles.load(PID, true);
+  assert.equal((await profiles.buy(PID, 'shield')).ok, false, 'без ⭐ купити не можна');
+  assert.equal((await profiles.buy(PID, 'нема')).ok, false);
+  await profiles.award(PID, { game: 'rps', result: 'w', bot: false, dur: 30000 });  // 10⭐ + бонус досягнення 15⭐
+  const before = profiles.view(await profiles.load(PID)).stars;
+  const b = await profiles.buy(PID, 'respin'); assert.ok(b.ok); assert.equal(b.profile.stars, before - 15); assert.equal(b.profile.inv.respin, 1);
+  assert.equal(await profiles.useItem(PID, 'respin'), true); assert.equal(await profiles.useItem(PID, 'respin'), false);
+  const base = { game: 'rps', bot: false, dur: 30000 };
+  assert.equal((await profiles.award(PID, { ...base, result: 'w', skills: ['double'] })).stars, 20);
+  assert.equal((await profiles.award(PID, { ...base, result: 'w', skills: ['xp2'] })).xp, 60);
+  assert.equal((await profiles.award(PID, { ...base, result: 'l', skills: ['comfort'] })).stars, 13);
+});
+
+test('WS: скіли діють лише за згодою обох; щит скасовує покарання; перекрутити колесо', async () => {
+  const crypto = require('node:crypto');
+  const PORT = 43000 + Math.floor(Math.random() * 900), dir = tmp();
+  const pa = 'c3'.repeat(16), pb = 'd4'.repeat(16);
+  const seed = {};
+  for (const pid of [pa, pb]) { const k = 'gft:p:' + crypto.createHash('sha256').update(pid).digest('hex').slice(0, 40); seed[k] = JSON.stringify({ v: 1, created: 1, name: '', xp: 0, stars: 500, games: {}, tot: { p: 0, w: 0, l: 0, d: 0, human: 0, pun: 0, chat: 0, react: 0, mar: 0 }, streak: 0, best: 0, days: { last: '', streak: 0, best: 0 }, botStars: { day: '', n: 0 }, ach: {}, hist: [], inv: {} }); }
+  fs.writeFileSync(path.join(dir, 'profiles.json'), JSON.stringify(seed));
+  const srv = spawn(process.execPath, ['server.js'], { cwd: path.join(__dirname, '..'), env: { ...process.env, PORT: String(PORT), DATA_DIR: dir, UPSTASH_REDIS_REST_URL: '', UPSTASH_REDIS_REST_TOKEN: '' }, stdio: ['ignore', 'pipe', 'inherit'] });
+  try {
+    await new Promise(res => srv.stdout.on('data', d => String(d).includes('http://') && res()));
+    const sleep = ms => new Promise(r => setTimeout(r, ms));
+    const mk = () => { const ws = new WebSocket('ws://localhost:' + PORT), c = { ws, got: [], S: null }; c.open = new Promise(r => ws.on('open', r)); ws.on('message', d => { const m = JSON.parse(d); if (m.type === 'room') c.S = m; else c.got.push(m); }); c.send = o => ws.send(JSON.stringify(o)); c.until = async (f, ms = 8000) => { const t = Date.now(); while (Date.now() - t < ms) { if (c.S && f(c.S)) return c.S; await sleep(30); } throw new Error('timeout S ' + JSON.stringify(c.S && c.S.sk)); }; return c; };
+    const a = mk(), b = mk(); await a.open; await b.open;
+    a.send({ type: 'hello', pid: pa, name: 'А' }); b.send({ type: 'hello', pid: pb, name: 'Б' }); await sleep(400);
+    for (const id of ['shield', 'respin']) { a.send({ type: 'buy', id }); b.send({ type: 'buy', id }); await sleep(120); }
+    a.send({ type: 'create', name: 'А', token: 'x1' }); await a.until(s => s.code);
+    b.send({ type: 'join', code: a.S.code, name: 'Б', token: 'x2' }); await a.until(s => s.online[0] && s.online[1]);
+    a.send({ type: 'settings', game: 'ttt', withPun: true }); a.send({ type: 'skload', ids: ['shield', 'respin', 'double'] }); b.send({ type: 'skload', ids: ['shield'] });
+    a.send({ type: 'skvote', on: true });
+    const s1 = await a.until(s => s.sk.vote[0] && s.sk.load[0].length === 2); assert.equal(s1.sk.on, false); assert.deepEqual(s1.sk.load[0], ['shield', 'respin']);
+    b.send({ type: 'skvote', on: true }); assert.equal((await a.until(s => s.sk.on)).sk.on, true);
+    a.send({ type: 'start' });
+    await a.until(s => s.phase === 'wheel');
+    const seq0 = a.S.wheel.seq; assert.deepEqual(a.S.sk.ids[0], ['shield', 'respin']); assert.deepEqual(a.S.sk.ids[1], ['shield']);
+    b.send({ type: 'skill', id: 'shield' }); await sleep(150); assert.deepEqual(a.S.sk.used[1], [], 'щит діє лише під час гри, не на колесі');
+    a.send({ type: 'skill', id: 'respin' }); await a.until(s => s.sk.used[0].includes('respin')); assert.notEqual(a.S.wheel.seq, seq0);
+    await a.until(s => s.phase === 'play', 12000);
+    a.send({ type: 'skill', id: 'respin' }); await sleep(150); assert.equal(a.S.sk.used[0].filter(x => x === 'respin').length, 1);
+    // гравець 1 береться за щит, гравець 0 перемагає
+    b.send({ type: 'skill', id: 'shield' }); await a.until(s => s.sk.used[1].includes('shield'));
+    for (let k = 0; k < 12 && a.S.phase === 'play'; k++) {
+      const v = a.S.view, free = v.b.map((x, i) => x === null ? i : -1).filter(i => i >= 0), t = v.turn;
+      const pick = t === 0 ? ([0, 1, 2].find(i => free.includes(i)) ?? free[0]) : ([3, 4, 5, 6, 7, 8].find(i => free.includes(i)) ?? free[0]);
+      (t === 0 ? a : b).send({ type: 'move', i: pick }); await sleep(80);
+    }
+    await a.until(s => s.phase === 'over');
+    if (a.S.winner === 0) assert.equal(a.S.series.hist.at(-1).p, null, 'щит скасував покарання');
+    // без згоди скілів немає: новий раунд — Богдан знімає згоду
+    a.send({ type: 'again' }); await a.until(s => s.phase === 'lobby'); b.send({ type: 'skvote', on: false });
+    await a.until(s => !s.sk.on); a.send({ type: 'start' }); await a.until(s => s.phase === 'wheel' || s.phase === 'play'); assert.equal(a.S.sk.ids, null);
+    // інвентар списано
+    const prof = await new Promise(r => { const t = mk(); t.open.then(() => { t.send({ type: 'restore', code: pa }); const iv = setInterval(() => { const m = t.got.find(x => x.type === 'profile'); if (m) { clearInterval(iv); r(m.profile); t.ws.close(); } }, 30); }); });
+    assert.equal(prof.inv.respin, undefined); assert.equal(prof.inv.shield, 1);
+    [a, b].forEach(x => x.ws.close());
+  } finally { srv.kill(); }
+});

@@ -8,6 +8,7 @@ const content2 = require('./content2');
 const bots = require('./bots');
 const profiles = require('./profiles');
 const achievements = require('./achievements');
+const skills = require('./skills');
 
 const PORT = process.env.PORT || 3000;
 const STATIC = {
@@ -25,6 +26,7 @@ const STATIC = {
   '/extra6.js': ['extra6.js', 'text/javascript'],
   '/extra7.js': ['extra7.js', 'text/javascript'],
   '/extra8.js': ['extra8.js', 'text/javascript'],
+  '/extra9.js': ['extra9.js', 'text/javascript'],
   '/manifest.webmanifest': ['manifest.webmanifest', 'application/manifest+json'],
   '/icon-192.png': ['icon-192.png', 'image/png'],
   '/icon-512.png': ['icon-512.png', 'image/png'],
@@ -64,7 +66,7 @@ function snapshot(r, i) {
     type: 'room', code: r.code, you: i,
     names: r.players.map(p => p && p.name), online: r.players.map(isOn), bot: !!r.bot, botGames: r.bot ? bots.SUPPORTED : undefined, mar: r.mar, marPick: r.marPick,
     game: r.game, diff: r.diff, deck: r.deck, perevod: r.perevod, lang: r.lang, len: r.len, daily: r.daily, mode: r.mode, topic: r.topic, pack: r.pack, packs: r.phase === 'lobby' ? content2.PACK_LIST : undefined, custom: r.custom, topics: r.phase === 'lobby' ? content.topicsFor(r.mode) : undefined, withPun: r.withPun, puns: r.puns, phase: r.phase, wheel: r.wheel, punishment: r.punishment,
-    winner: r.state ? r.state.winner : null, series: r.series,
+    winner: r.state ? r.state.winner : null, series: r.series, sk: skSnap(r),
     view: playing ? games[r.game].view(r.state, i) : null,
   };
 }
@@ -104,8 +106,40 @@ function cleanCustom(c) {                               // власні пита
     only: c.only === true,
   };
 }
+function skSnap(r) {
+  return { on: !!(r.skVote[0] && r.skVote[1]), vote: r.skVote, load: r.skLoad, ids: r.sk ? r.sk.map(x => x.ids) : null, used: r.sk ? r.sk.map(x => x.used) : null };
+}
+function armSkills(r) {                                         // фіксує обрані скіли на початку гри (лише за згодою обох)
+  const pids = r.players.map(p => (p && !p.bot && p.pid) || null);
+  if (!(r.skVote[0] && r.skVote[1]) || (pids[0] && pids[0] === pids[1])) { r.sk = null; return; }
+  r.sk = [0, 1].map(i => {
+    const prof = pids[i] && profiles.peek(pids[i]), inv = (prof && prof.inv) || {};
+    return { ids: r.skLoad[i].filter(id => inv[id] > 0).slice(0, skills.SLOTS), used: [] };
+  });
+}
+function useSkill(r, i, id, ws) {
+  if (!r.sk || !r.sk[i]) return;
+  const s = r.sk[i], def = skills.byId(id), pid = r.players[i] && r.players[i].pid;
+  if (!def || !pid || !s.ids.includes(id) || s.used.includes(id)) return;
+  if (def.when !== r.phase) return send(ws, { type: 'toast', msg: def.when === 'wheel' ? 'Цей скіл діє лише поки крутиться колесо' : 'Цей скіл діє лише під час гри' });
+  if (id === 'respin' && (r.mar || !r.withPun || r.puns.length < 2)) return;
+  s.used.push(id);                                              // резервуємо одразу, щоб не спрацював двічі
+  profiles.useItem(pid, id).then(ok => {
+    if (!ok) { s.used = s.used.filter(x => x !== id); return; }
+    if (id === 'respin' && r.phase === 'wheel') {
+      clearTimers(r);
+      const target = rnd(r.puns.length);
+      r.wheel = { target, turns: 5 + rnd(4), seq: Date.now() }; r.punishment = r.puns[target];
+      const t = setTimeout(() => { r.timers.delete(t); if (r.phase === 'wheel') begin(r); }, 6800); r.timers.add(t);
+    }
+    const nm = r.players[i] ? r.players[i].name : 'Гравець';
+    r.players.forEach(p => p && send(p.ws, { type: 'toast', msg: `${def.icon} ${nm} використав(ла) «${def.name}»` }));
+    broadcast(r); pushProfile(r.players[i] && r.players[i].ws, 'profile', {});
+  }).catch(e => { console.error(e); s.used = s.used.filter(x => x !== id); });
+}
 function pushProfile(ws, type, extra) { if (ws && ws.pid) profiles.load(ws.pid, false).then(p => p && send(ws, { type, ...extra, profile: profiles.view(p) })); }
 function sendReward(r, i, res) { const p = r.players[i]; if (p && p.ws && res && !res.short) send(p.ws, { type: 'reward', ...res }); else if (p && p.ws && res) send(p.ws, { type: 'profile', profile: res.profile }); }
+const shielded = (r, i) => !!(r.sk && r.sk[i] && r.sk[i].used.includes('shield'));
 function rewardRound(r) {                                      // нагороди за завершену партію (зірки, XP, досягнення)
   const w = r.state.winner, dur = Date.now() - (r.startedAt || Date.now());
   const pids = r.players.map(p => (p && !p.bot && p.pid) || null);
@@ -114,7 +148,7 @@ function rewardRound(r) {                                      // нагород
     if (!pid) return;
     const result = w === 'draw' ? 'd' : w === i ? 'w' : 'l';
     let extra = {}; try { extra = achievements.gameFacts(r.game, r.state, i, r); } catch (e) {}
-    const facts = { ...extra, game: r.game, result, bot: !!r.bot, diff: r.diff, dur, punished: result === 'l' && !!(r.withPun && r.punishment) };
+    const facts = { ...extra, game: r.game, result, bot: !!r.bot, diff: r.diff, dur, skills: r.sk && r.sk[i] ? r.sk[i].used : [], punished: result === 'l' && !!(r.withPun && r.punishment) && !shielded(r, i) };
     profiles.award(pid, facts).then(res => sendReward(r, i, res)).catch(e => console.error(e));
   });
 }
@@ -124,7 +158,7 @@ function check(r) {
   r.phase = 'over';
   const w = r.state.winner, S = r.series;                      // рахунок серії та історія покарань
   if (w === 'draw') S.d++; else S.w[w]++;
-  S.hist.push({ g: r.game, w, p: r.withPun && r.punishment && w !== 'draw' ? r.punishment : null });
+  S.hist.push({ g: r.game, w, p: r.withPun && r.punishment && w !== 'draw' && !shielded(r, 1 - w) ? r.punishment : null });
   if (S.hist.length > 30) S.hist.shift();
   try { rewardRound(r); } catch (e) { console.error(e); }
   if (r.mar) { if (w === 'draw') r.mar.d++; else r.mar.w[w]++; r.mar.res.push({ g: r.game, w }); }      // підсумок марафону
@@ -155,7 +189,7 @@ function startGame(r, ws) {
   const mara = r.phase === 'lobby' && r.marPick.length >= 2;
   const list = mara ? r.marPick : [r.game];
   if (r.bot && list.some(g => !bots.SUPPORTED.includes(g))) return send(ws, { type: 'error', msg: '🤖 Бот ще не вміє цю гру' });
-  clearTimers(r);
+  clearTimers(r); armSkills(r);
   if (mara) {                                                  // марафон: колеса перед іграми немає
     r.mar = { games: [...r.marPick], idx: 0, w: [0, 0], d: 0, res: [], done: false };
     r.game = r.mar.games[0]; r.wheel = null; r.punishment = null;
@@ -172,7 +206,7 @@ function startGame(r, ws) {
   r.wheel = null; r.punishment = null;
   return begin(r);
 }
-function toLobby(r) { clearTimers(r); clearTimeout(r.botT); r.botT = null; r.mar = null; r.phase = 'lobby'; r.state = null; r.wheel = null; r.punishment = null; }
+function toLobby(r) { clearTimers(r); clearTimeout(r.botT); r.botT = null; r.mar = null; r.sk = null; r.phase = 'lobby'; r.state = null; r.wheel = null; r.punishment = null; }
 
 function cleanPuns(a) {
   if (!Array.isArray(a)) return null;
@@ -188,8 +222,16 @@ function handle(ws, m) {
     profiles.load(pid, true, String(m.name || '').slice(0, 20)).then(p => {
       if (!p) return send(ws, { type: 'error', msg: 'Профіль недоступний' });
       profiles.setName(pid, String(m.name || ''));
-      send(ws, { type: 'profile', profile: profiles.view(p), defs: achievements.publicDefs() });
+      send(ws, { type: 'profile', profile: profiles.view(p), defs: achievements.publicDefs(), skills: skills.CATALOG, fams: skills.FAMS });
       return profiles.daily(pid).then(res => res && send(ws, { type: 'reward', ...res }));
+    }).catch(e => console.error(e));
+    return;
+  }
+  if (m.type === 'buy') {                                        // покупка скіла в магазині за ⭐
+    if (!ws.pid) return;
+    profiles.buy(ws.pid, String(m.id || '')).then(res => {
+      if (!res.ok) return send(ws, { type: 'toast', msg: res.msg });
+      const d = skills.byId(m.id); send(ws, { type: 'profile', profile: res.profile }); send(ws, { type: 'toast', msg: `Куплено: ${d.icon} ${d.name}` });
     }).catch(e => console.error(e));
     return;
   }
@@ -200,17 +242,17 @@ function handle(ws, m) {
     profiles.load(code, false).then(p => {
       if (!p) return send(ws, { type: 'restored', ok: false });
       ws.pid = code; if (ws.room && ws.room.players[ws.idx]) ws.room.players[ws.idx].pid = code;
-      send(ws, { type: 'restored', ok: true, pid: code }); send(ws, { type: 'profile', profile: profiles.view(p), defs: achievements.publicDefs() });
+      send(ws, { type: 'restored', ok: true, pid: code }); send(ws, { type: 'profile', profile: profiles.view(p), defs: achievements.publicDefs(), skills: skills.CATALOG, fams: skills.FAMS });
     }).catch(e => console.error(e));
     return;
   }
   if (m.type === 'create') {
     const code = newCode();
-    const r = { code, players: [null, null], game: 'ttt', diff: 'normal', deck: '36', perevod: true, lang: 'uk', len: 5, daily: false, pack: 'mix', custom: emptyCustom(), mode: 'normal', topic: 'mix', withPun: false, puns: [...DEFAULT_PUNS], phase: 'lobby', state: null, wheel: null, punishment: null, timers: new Set(), series: newSeries(), chat: [], bot: false, marPick: [], mar: null };
+    const r = { code, players: [null, null], game: 'ttt', diff: 'normal', deck: '36', perevod: true, lang: 'uk', len: 5, daily: false, pack: 'mix', custom: emptyCustom(), mode: 'normal', topic: 'mix', withPun: false, puns: [...DEFAULT_PUNS], phase: 'lobby', state: null, wheel: null, punishment: null, timers: new Set(), series: newSeries(), chat: [], bot: false, marPick: [], mar: null, skVote: [false, false], skLoad: [[], []], sk: null };
     rooms.set(code, r);
     ws.room = r; ws.idx = 0; ws.token = String(m.token || '');
     r.players[0] = { ws, name: String(m.name || 'Гравець').slice(0, 20), token: ws.token, pid: ws.pid };
-    if (m.bot === true) { r.bot = true; r.players[1] = { ws: null, bot: true, name: '🤖 Бот', token: 'bot-' + code }; }
+    if (m.bot === true) { r.bot = true; r.skVote[1] = true; r.players[1] = { ws: null, bot: true, name: '🤖 Бот', token: 'bot-' + code }; }
     return broadcast(r);
   }
   if (m.type === 'join') {
@@ -221,7 +263,7 @@ function handle(ws, m) {
     if (i === -1) i = r.players.findIndex(p => !p);
     if (i === -1) return send(ws, { type: 'error', msg: 'Кімната вже заповнена', fatal: true });
     const old = r.players[i];
-    if (!old) { r.series = newSeries(); r.chat = []; }
+    if (!old) { r.series = newSeries(); r.chat = []; r.skVote[i] = false; r.skLoad[i] = []; }
     if (old && old.ws && old.ws !== ws) { old.ws.room = null; old.ws.close(); }
     ws.room = r; ws.idx = i; ws.token = token;
     r.players[i] = { ws, name: String(m.name || 'Гравець').slice(0, 20), token, pid: ws.pid };
@@ -252,6 +294,14 @@ function handle(ws, m) {
       if (typeof m.withPun === 'boolean') r.withPun = m.withPun;
       if (m.puns) { const p = cleanPuns(m.puns); if (p) r.puns = p; }
       return broadcast(r);
+    case 'skvote':                       // згода на скіли (потрібна від обох)
+      if (r.phase !== 'lobby' || r.bot && i === 1) return;
+      r.skVote[i] = m.on === true; return broadcast(r);
+    case 'skload': {
+      if (r.phase !== 'lobby' || !Array.isArray(m.ids)) return;
+      r.skLoad[i] = [...new Set(m.ids.filter(id => skills.byId(id)))].slice(0, skills.SLOTS); return broadcast(r);
+    }
+    case 'skill': return useSkill(r, i, String(m.id || ''), ws);
     case 'start':
       if (r.phase !== 'lobby') return;
       return startGame(r, ws);
@@ -274,11 +324,11 @@ function handle(ws, m) {
       return;
     case 'next':                         // марафон: наступна гра або підсумок
       if (!r.mar || r.phase !== 'over') return;
-      if (r.mar.idx + 1 < r.mar.games.length) { r.mar.idx++; r.game = r.mar.games[r.mar.idx]; clearTimers(r); return begin(r); }
+      if (r.mar.idx + 1 < r.mar.games.length) { r.mar.idx++; r.game = r.mar.games[r.mar.idx]; clearTimers(r); armSkills(r); return begin(r); }
       return finishMarathon(r);
     case 'unbot':                        // замінити бота живою людиною
       if (!r.bot || r.phase !== 'lobby') return;
-      r.bot = false; r.players[1] = null; r.series = newSeries(); r.chat = []; return broadcast(r);
+      r.bot = false; r.players[1] = null; r.skVote[1] = false; r.skLoad[1] = []; r.series = newSeries(); r.chat = []; return broadcast(r);
     case 'react': {
       if (!REACTS.includes(m.e)) return;
       r.players.forEach(p => p && send(p.ws, { type: 'react', from: i, e: m.e }));
@@ -295,7 +345,7 @@ function handle(ws, m) {
     }
     case 'leave':
       if (r.bot) { clearTimers(r); clearTimeout(r.botT); rooms.delete(r.code); ws.room = null; return; }
-      r.players[i] = null; ws.room = null; r.series = newSeries(); r.chat = [];
+      r.players[i] = null; ws.room = null; r.skVote[i] = false; r.skLoad[i] = []; r.series = newSeries(); r.chat = [];
       if (!r.players[0] && !r.players[1]) { clearTimers(r); rooms.delete(r.code); }
       else { toLobby(r); broadcast(r); }
       return;
@@ -320,3 +370,4 @@ wss.on('connection', ws => {
 setInterval(() => wss.clients.forEach(ws => { if (!ws.isAlive) return ws.terminate(); ws.isAlive = false; ws.ping(); }), 25000);
 
 server.listen(PORT, () => console.log('Games for two on http://localhost:' + PORT));
+process.on('SIGTERM', () => { try { profiles.flushAll(); } catch (e) {} process.exit(0); });
