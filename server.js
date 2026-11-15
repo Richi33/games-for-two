@@ -6,6 +6,8 @@ const games = require('./games');
 const content = require('./content');
 const content2 = require('./content2');
 const bots = require('./bots');
+const profiles = require('./profiles');
+const achievements = require('./achievements');
 
 const PORT = process.env.PORT || 3000;
 const STATIC = {
@@ -22,6 +24,7 @@ const STATIC = {
   '/extra5.js': ['extra5.js', 'text/javascript'],
   '/extra6.js': ['extra6.js', 'text/javascript'],
   '/extra7.js': ['extra7.js', 'text/javascript'],
+  '/extra8.js': ['extra8.js', 'text/javascript'],
   '/manifest.webmanifest': ['manifest.webmanifest', 'application/manifest+json'],
   '/icon-192.png': ['icon-192.png', 'image/png'],
   '/icon-512.png': ['icon-512.png', 'image/png'],
@@ -101,6 +104,20 @@ function cleanCustom(c) {                               // власні пита
     only: c.only === true,
   };
 }
+function pushProfile(ws, type, extra) { if (ws && ws.pid) profiles.load(ws.pid, false).then(p => p && send(ws, { type, ...extra, profile: profiles.view(p) })); }
+function sendReward(r, i, res) { const p = r.players[i]; if (p && p.ws && res && !res.short) send(p.ws, { type: 'reward', ...res }); else if (p && p.ws && res) send(p.ws, { type: 'profile', profile: res.profile }); }
+function rewardRound(r) {                                      // нагороди за завершену партію (зірки, XP, досягнення)
+  const w = r.state.winner, dur = Date.now() - (r.startedAt || Date.now());
+  const pids = r.players.map(p => (p && !p.bot && p.pid) || null);
+  if (pids[0] && pids[0] === pids[1]) return;                  // той самий пристрій з двох вкладок — без нагород
+  pids.forEach((pid, i) => {
+    if (!pid) return;
+    const result = w === 'draw' ? 'd' : w === i ? 'w' : 'l';
+    let extra = {}; try { extra = achievements.gameFacts(r.game, r.state, i, r); } catch (e) {}
+    const facts = { ...extra, game: r.game, result, bot: !!r.bot, diff: r.diff, dur, punished: result === 'l' && !!(r.withPun && r.punishment) };
+    profiles.award(pid, facts).then(res => sendReward(r, i, res)).catch(e => console.error(e));
+  });
+}
 const newSeries = () => ({ w: [0, 0], d: 0, hist: [] });
 function check(r) {
   if (!r.state || r.state.winner == null || r.phase === 'over') return;
@@ -109,18 +126,20 @@ function check(r) {
   if (w === 'draw') S.d++; else S.w[w]++;
   S.hist.push({ g: r.game, w, p: r.withPun && r.punishment && w !== 'draw' ? r.punishment : null });
   if (S.hist.length > 30) S.hist.shift();
+  try { rewardRound(r); } catch (e) { console.error(e); }
   if (r.mar) { if (w === 'draw') r.mar.d++; else r.mar.w[w]++; r.mar.res.push({ g: r.game, w }); }      // підсумок марафону
 }
 
 function begin(r) {
   const g = games[r.game];
-  r.botCtx = {}; r.state = g.init({ diff: r.diff, deck: r.deck, perevod: r.perevod, lang: r.lang, len: r.len, daily: r.daily, mode: r.mode, topic: r.topic, pack: r.pack, custom: r.custom }); r.phase = 'play';
+  r.botCtx = {}; r.state = g.init({ diff: r.diff, deck: r.deck, perevod: r.perevod, lang: r.lang, len: r.len, daily: r.daily, mode: r.mode, topic: r.topic, pack: r.pack, custom: r.custom }); r.phase = 'play'; r.startedAt = Date.now();
   if (g.start) g.start(r.state, sched(r));
   broadcast(r);
 }
 function finishMarathon(r) {
   r.mar.done = true; clearTimers(r);
   const [a, b] = r.mar.w;
+  r.players.forEach((p, i) => { if (p && !p.bot && p.pid) profiles.awardMarathon(p.pid, a !== b && (a > b ? 0 : 1) === i).then(res => sendReward(r, i, res)).catch(e => console.error(e)); });
   if (r.withPun && a !== b && r.puns.length >= 2) {            // колесо крутиться в кінці — для загального програвшого
     const target = rnd(r.puns.length);
     r.wheel = { target, turns: 5 + rnd(4), seq: Date.now() };
@@ -161,12 +180,36 @@ function cleanPuns(a) {
 }
 
 function handle(ws, m) {
+  if (m.type === 'hello') {                                      // пристрій представляється секретним кодом профілю
+    const pid = String(m.pid || '');
+    if (!profiles.PID_RE.test(pid)) return;
+    ws.pid = pid;
+    if (ws.room && ws.room.players[ws.idx]) ws.room.players[ws.idx].pid = pid;
+    profiles.load(pid, true, String(m.name || '').slice(0, 20)).then(p => {
+      if (!p) return send(ws, { type: 'error', msg: 'Профіль недоступний' });
+      profiles.setName(pid, String(m.name || ''));
+      send(ws, { type: 'profile', profile: profiles.view(p), defs: achievements.publicDefs() });
+      return profiles.daily(pid).then(res => res && send(ws, { type: 'reward', ...res }));
+    }).catch(e => console.error(e));
+    return;
+  }
+  if (m.type === 'restore') {                                    // перенесення профілю на інший пристрій кодом
+    const code = String(m.code || '').trim().toLowerCase();
+    if (!profiles.PID_RE.test(code)) return send(ws, { type: 'restored', ok: false });
+    ws.restoreTries = (ws.restoreTries || 0) + 1; if (ws.restoreTries > 8) return send(ws, { type: 'restored', ok: false });
+    profiles.load(code, false).then(p => {
+      if (!p) return send(ws, { type: 'restored', ok: false });
+      ws.pid = code; if (ws.room && ws.room.players[ws.idx]) ws.room.players[ws.idx].pid = code;
+      send(ws, { type: 'restored', ok: true, pid: code }); send(ws, { type: 'profile', profile: profiles.view(p), defs: achievements.publicDefs() });
+    }).catch(e => console.error(e));
+    return;
+  }
   if (m.type === 'create') {
     const code = newCode();
     const r = { code, players: [null, null], game: 'ttt', diff: 'normal', deck: '36', perevod: true, lang: 'uk', len: 5, daily: false, pack: 'mix', custom: emptyCustom(), mode: 'normal', topic: 'mix', withPun: false, puns: [...DEFAULT_PUNS], phase: 'lobby', state: null, wheel: null, punishment: null, timers: new Set(), series: newSeries(), chat: [], bot: false, marPick: [], mar: null };
     rooms.set(code, r);
     ws.room = r; ws.idx = 0; ws.token = String(m.token || '');
-    r.players[0] = { ws, name: String(m.name || 'Гравець').slice(0, 20), token: ws.token };
+    r.players[0] = { ws, name: String(m.name || 'Гравець').slice(0, 20), token: ws.token, pid: ws.pid };
     if (m.bot === true) { r.bot = true; r.players[1] = { ws: null, bot: true, name: '🤖 Бот', token: 'bot-' + code }; }
     return broadcast(r);
   }
@@ -181,7 +224,7 @@ function handle(ws, m) {
     if (!old) { r.series = newSeries(); r.chat = []; }
     if (old && old.ws && old.ws !== ws) { old.ws.room = null; old.ws.close(); }
     ws.room = r; ws.idx = i; ws.token = token;
-    r.players[i] = { ws, name: String(m.name || 'Гравець').slice(0, 20), token };
+    r.players[i] = { ws, name: String(m.name || 'Гравець').slice(0, 20), token, pid: ws.pid };
     r.dead && clearTimeout(r.dead);
     broadcast(r); send(ws, { type: 'chathist', list: r.chat });
     return;
@@ -238,7 +281,8 @@ function handle(ws, m) {
       r.bot = false; r.players[1] = null; r.series = newSeries(); r.chat = []; return broadcast(r);
     case 'react': {
       if (!REACTS.includes(m.e)) return;
-      r.players.forEach(p => p && send(p.ws, { type: 'react', from: i, e: m.e })); return;
+      r.players.forEach(p => p && send(p.ws, { type: 'react', from: i, e: m.e }));
+      if (ws.pid) profiles.bump(ws.pid, 'react').then(res => res && send(ws, { type: 'reward', ...res })); return;
     }
     case 'chat': {
       const t = String(m.t || '').trim().replace(/\s+/g, ' ').slice(0, 120), now = Date.now();
@@ -246,7 +290,8 @@ function handle(ws, m) {
       ws.lastChat = now;
       const msg = { from: i, name: r.players[i] ? r.players[i].name : '', t, ts: now };
       r.chat.push(msg); if (r.chat.length > 30) r.chat.shift();
-      r.players.forEach(p => p && send(p.ws, { type: 'chat', ...msg })); return;
+      r.players.forEach(p => p && send(p.ws, { type: 'chat', ...msg }));
+      if (ws.pid) profiles.bump(ws.pid, 'chat').then(res => res && send(ws, { type: 'reward', ...res })); return;
     }
     case 'leave':
       if (r.bot) { clearTimers(r); clearTimeout(r.botT); rooms.delete(r.code); ws.room = null; return; }
