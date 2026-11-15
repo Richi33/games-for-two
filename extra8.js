@@ -15,7 +15,8 @@
 @keyframes pfin{from{opacity:0;transform:translateY(-14px)}to{opacity:1;transform:none}}`;
   document.head.appendChild(st);
   const E = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-  let P = null, defs = [];
+  let P = null, defs = [], SK = [], FAMS = {};
+  window.pfGet = () => P; window.pfSkills = () => SK; window.pfFams = () => FAMS;
   const btn = document.createElement('button'); btn.id = 'pfBtn'; document.body.appendChild(btn);
   const box = document.createElement('div'); box.id = 'pfBox'; document.body.appendChild(box);
   const pop = document.createElement('div'); pop.id = 'pfPop'; document.body.appendChild(pop);
@@ -34,6 +35,7 @@
 <div class="pf-h"><div class="pf-av">${P.level}</div><div style="flex:1"><b style="font-size:18px">${E(P.name || 'Гравець')}</b><div class="muted">${E(P.title)} · рівень ${P.level}</div>
 <div class="pf-bar"><i style="width:${pct}%"></i></div><div class="muted" style="font-size:12px">XP: ${P.xpCur} / ${P.xpNeed}</div></div><div style="font-size:20px;font-weight:800">⭐ ${P.stars}</div></div>
 <div class="pf-st"><div><b>${t.p}</b><span>ігор</span></div><div><b>${t.w}</b><span>перемог</span></div><div><b>${P.best}</b><span>серія 🔥</span></div><div><b>${P.days.streak}</b><span>днів поспіль</span></div></div>
+<h3>🛒 Магазин скілів</h3><div class="muted" style="font-size:13px">Скіли вмикаються в лобі, лише якщо погодились обоє. До 2 на гру, кожен — раз.</div>${shop()}
 <h3>🏅 Досягнення ${have}/${defs.length}</h3><div class="pf-ac">${defs.map(d => {
       const tier = P.ach[d.id] || 0, tiers = d.tiers.length;
       return `<div class="pf-a ${tier ? '' : 'off'}"><b>${d.icon} ${E(d.name)}</b><span>${E(d.desc)}</span><div class="t">${tiers > 1 ? `Рівень ${tier}/${tiers}` : (tier ? '✔ отримано' : 'ще ні')}${tiers > 1 ? ' · наступна ціль: ' + (d.tiers[tier] || 'максимум') : ''}</div></div>`;
@@ -43,6 +45,8 @@
 <input id="pfCode" readonly value="${E(localStorage.gft_pid)}" onclick="this.select()" style="font-family:monospace;font-size:13px">
 <p class="muted" style="font-size:13px;margin-bottom:4px">Вхід з іншого пристрою:</p><div class="row"><input id="pfIn" placeholder="вставте код" style="flex:1"><button onclick="pfRestore()" style="width:auto;margin:0">Ввійти</button></div></div>`;
   }
+  const shop = () => SK.map(s => { const n = (P.inv || {})[s.id] || 0, can = P.stars >= s.price;
+    return `<div class="pf-a" style="display:flex;gap:10px;align-items:center;margin:6px 0"><div style="font-size:28px">${s.icon}</div><div style="flex:1"><b>${E(s.name)} <span class="t">· ${E(FAMS[s.fam] || '')}</span></b><span>${E(s.desc)}</span><div class="t">У вас: ${n}</div></div><button style="width:auto;margin:0" ${can ? '' : 'disabled'} onclick="send({type:'buy',id:'${s.id}'})">⭐ ${s.price}</button></div>`; }).join('');
   window.pfRestore = () => { const c = (document.getElementById('pfIn').value || '').trim().toLowerCase(); if (c) send({ type: 'restore', code: c }); };
 
   function show(html) { const d = document.createElement('div'); d.className = 'pf-r'; d.innerHTML = html; pop.appendChild(d); setTimeout(() => d.remove(), 6500); }
@@ -58,7 +62,7 @@
   }
   const prev = window.onExtraMsg;
   window.onExtraMsg = m => {
-    if (m.type === 'profile') { P = m.profile; if (m.defs) defs = m.defs; label(); if (box.style.display === 'block') draw(); }
+    if (m.type === 'profile') { P = m.profile; if (m.defs) defs = m.defs; if (m.skills) SK = m.skills; if (m.fams) FAMS = m.fams; label(); if (box.style.display === 'block') draw(); }
     else if (m.type === 'reward') reward(m);
     else if (m.type === 'restored') {
       if (m.ok) { localStorage.gft_pid = m.pid; toast('Профіль відновлено'); setTimeout(() => location.reload(), 700); } else toast('Код не підійшов');
@@ -66,6 +70,16 @@
     else if (prev) prev(m);
   };
   const base = window.render;
-  window.render = function () { base(); btn.style.display = (!S && box.style.display !== 'block') ? 'block' : 'none'; label(); };
+  window.render = function () {
+    base(); btn.style.display = (!S && box.style.display !== 'block') ? 'block' : 'none'; label();
+    if (S && S.phase === 'lobby') {                                  // у лобі — смужка профілю під заголовком
+      const bar = document.querySelector('#app .bar');
+      if (bar && !document.getElementById('pfChip')) {
+        const c = document.createElement('button'); c.id = 'pfChip'; c.className = 'ghost'; c.style.cssText = 'width:100%;margin:0 0 8px;text-align:left';
+        c.onclick = () => open(); bar.after(c);
+      }
+      const c = document.getElementById('pfChip'); if (c) c.textContent = P ? `👤 ${P.title} · рівень ${P.level} · ⭐ ${P.stars}  ›` : '👤 Профіль ›';
+    }
+  };
   window.render();
 })();

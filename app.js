@@ -253,7 +253,8 @@ function game() {
     const w = S.winner, me = w === S.you;
     const cls = w === 'draw' ? 'draw' : me ? 'win' : 'lose';
     const title = w === 'draw' ? '🤝 Нічия!' : me ? '🏆 Ви перемогли!' : '😔 Ви програли';
-    const pun = S.withPun && S.punishment && w !== 'draw' ? `<div>😈 <b>${esc(S.names[1 - w])}</b> виконує: <b>${esc(S.punishment)}</b></div>` : '';
+    const shd = w !== 'draw' && S.sk && S.sk.used && S.sk.used[1 - w] && S.sk.used[1 - w].includes('shield');
+    const pun = shd ? `<div>🛡 <b>${esc(S.names[1 - w])}</b> захищений(а) щитом — покарання скасовано</div>` : S.withPun && S.punishment && w !== 'draw' ? `<div>😈 <b>${esc(S.names[1 - w])}</b> виконує: <b>${esc(S.punishment)}</b></div>` : '';
     const btns = S.mar
       ? `<button class="primary" onclick="send({type:'next'})">${S.mar.idx + 1 >= S.mar.games.length ? '🏁 Підсумок марафону' : '➜ Далі: ' + gname(S.mar.games[S.mar.idx + 1])}</button>`
       : `<button class="primary" onclick="send({type:'restart'})">🔁 Почати заново</button><button onclick="send({type:'again'})">🏠 В меню</button>`;
