@@ -23,7 +23,7 @@ button.dc{cursor:pointer}button.dc:disabled{opacity:1}
   GAMES.push({ id: 'durak', e: '🃏', n: 'Дурень', d: 'Звичайний або переводний, 24/36/52' });
 
   const SY = ['♠', '♥', '♦', '♣'], RL = { 11: 'В', 12: 'Д', 13: 'К', 14: 'Т' };
-  const lab = r => RL[r] || r;
+  const lab = r => rk(RL[r] || r);
   const cid = c => c.r + '.' + c.s;
   let dSel = null;
 

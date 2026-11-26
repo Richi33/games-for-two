@@ -38,7 +38,7 @@
     if (ev.kind === 'coin') return wrap(`<div class="lk-big">${o.detail.side === 0 ? '🦅' : '🪙'}</div><div class="lk-final">${finalTxt}</div>`);
     if (ev.kind === 'roulette') return wrap(`<div class="lk-num ${o.detail.color}">${o.detail.n}</div><div class="lk-final">${finalTxt}</div>`);
     if (ev.kind === 'dice') return wrap(`<div class="lk-dice">${o.detail.dice.map(d => DICE[d]).join(' ')}</div><div class="lk-final">${o.detail.dice.length === 2 ? 'Сума ' + (o.detail.dice[0] + o.detail.dice[1]) : 'Випало ' + o.detail.dice[0]} · ${finalTxt}</div>`);
-    if (ev.kind === 'suit') { const red = o.detail.suit === 1 || o.detail.suit === 2; return wrap(`<div class="lk-card ${red ? 'red' : ''}"><span>${esc(o.detail.rank)}</span><span>${ev.opts[o.detail.suit].e}</span></div><div class="lk-final">${finalTxt}</div>`); }
+    if (ev.kind === 'suit') { const red = o.detail.suit === 1 || o.detail.suit === 2; return wrap(`<div class="lk-card ${red ? 'red' : ''}"><span>${esc(rk(o.detail.rank))}</span><span>${ev.opts[o.detail.suit].e}</span></div><div class="lk-final">${finalTxt}</div>`); }
     if (ev.kind === 'urn') return wrap(`<div class="lk-big">${w.e}</div><div class="lk-final">${finalTxt}</div>`);
     // перегони: кожен учасник їде зі своєю швидкістю; порядок фінішу задано сервером
     const order = o.detail.order, rows = ev.opts.map(op => {

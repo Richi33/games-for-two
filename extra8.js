@@ -21,7 +21,7 @@
   const box = document.createElement('div'); box.id = 'pfBox'; document.body.appendChild(box);
   const pop = document.createElement('div'); pop.id = 'pfPop'; document.body.appendChild(pop);
   const gname = id => { const g = (typeof GAMES !== 'undefined' ? GAMES : []).find(x => x.id === id); return g ? g.e + ' ' + g.n : id; };
-  const label = () => { btn.textContent = P ? `👤 ${P.title} · ⭐ ${P.stars}` : '👤 Профіль'; };
+  const label = () => { btn.textContent = P ? `👤 ${tr(P.title)} · ⭐ ${P.stars}` : '👤 Профіль'; };
   btn.onclick = () => open();
 
   function open() { box.style.display = 'block'; draw(); }
@@ -56,8 +56,8 @@
     if (m.daily) parts.push(`<b>🎁 Щоденний бонус: +${m.daily.stars} ⭐</b><div class="muted">Днів поспіль: ${m.daily.streak}</div>`);
     else if (m.marathon) parts.push(`<b>🏁 Марафон завершено</b>: +${m.stars} ⭐ +${m.xp} XP`);
     else if (m.stars || m.xp) parts.push(`<b>${m.result === 'w' ? '🏆 Перемога' : m.result === 'd' ? '🤝 Нічия' : '🎮 Гру зіграно'}</b>: +${m.stars} ⭐ +${m.xp} XP`);
-    (m.ach || []).forEach(a => parts.push(`<b>${a.icon} Досягнення: ${E(a.name)}${a.of > 1 ? ' (' + a.tier + '/' + a.of + ')' : ''}</b> +${a.stars} ⭐`));
-    if (m.levelUp) parts.push(`<b>⬆ Новий рівень: ${m.levelUp}!</b> ${E(P ? P.title : '')}`);
+    (m.ach || []).forEach(a => parts.push(`<b>${a.icon} Досягнення: ${E(tr(a.name))}${a.of > 1 ? ' (' + a.tier + '/' + a.of + ')' : ''}</b> +${a.stars} ⭐`));
+    if (m.levelUp) parts.push(`<b>⬆ Новий рівень: ${m.levelUp}!</b> ${E(P ? tr(P.title) : '')}`);
     parts.forEach(p => show(p)); label(); if (box.style.display === 'block') draw();
   }
   const prev = window.onExtraMsg;
@@ -78,7 +78,7 @@
         const c = document.createElement('button'); c.id = 'pfChip'; c.className = 'ghost'; c.style.cssText = 'width:100%;margin:0 0 8px;text-align:left';
         c.onclick = () => open(); bar.after(c);
       }
-      const c = document.getElementById('pfChip'); if (c) c.textContent = P ? `👤 ${P.title} · рівень ${P.level} · ⭐ ${P.stars}  ›` : '👤 Профіль ›';
+      const c = document.getElementById('pfChip'); if (c) c.textContent = P ? tf('👤 {0} · рівень {1} · ⭐ {2} ›', tr(P.title), P.level, P.stars) : '👤 Профіль ›';
     }
   };
   window.render();

@@ -122,7 +122,7 @@
 
   // ----- Двадцять одне -----
   R.bj = v => {
-    const card = c => c ? `<span class="pcard ${/[♥♦]/.test(c.t) ? 'red' : ''}">${c.t}</span>` : '<span class="pcard back">?</span>';
+    const card = c => c ? `<span class="pcard ${/[♥♦]/.test(c.t) ? 'red' : ''}">${rk(c.t)}</span>` : '<span class="pcard back">?</span>';
     const over = S.phase === 'over', my = S.phase === 'play' && v.turn === S.you;
     return {
       st: turnSt(v.turn) + (v.stand[S.you] ? ' · ви спасували' : ''),

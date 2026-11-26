@@ -5,4 +5,7 @@
 img{width:96px;height:96px;border-radius:22px}h1{margin:16px 0 6px}p{color:#9aa0c3;max-width:320px;margin:0 auto 18px}
 button{font:inherit;font-weight:700;color:#fff;background:#7c6cff;border:0;border-radius:12px;padding:12px 22px;cursor:pointer}</style></head>
 <body><main><img src="/icon-192.png" alt=""><h1>Немає мережі 📡</h1><p>Для гри з другом потрібен інтернет. Перевірте з’єднання й спробуйте ще раз — ваша кімната збережеться.</p><button onclick="location.href='/'">Спробувати знову</button></main>
-<script>addEventListener('online',()=>location.href='/')</script></body></html>
+<script>addEventListener('online',()=>location.href='/');
+(function(){var T={en:['No connection 📡','Playing with a friend needs the internet. Check your connection and try again — your room will be kept.','Try again','No connection'],ru:['Нет сети 📡','Для игры с другом нужен интернет. Проверьте соединение и попробуйте ещё раз — ваша комната сохранится.','Попробовать снова','Нет сети']};
+var l;try{l=localStorage.gft_lang}catch(e){}if(!T[l]&&l!=='uk'){var n=(navigator.language||'uk').slice(0,2).toLowerCase();l=n==='ru'?'ru':n==='uk'?'uk':'en'}
+var t=T[l];if(!t)return;document.documentElement.lang=l;document.title=t[3];document.querySelector('h1').textContent=t[0];document.querySelector('p').textContent=t[1];document.querySelector('button').textContent=t[2]})()</script></body></html>
