@@ -72,7 +72,7 @@
     if (over) st = 'Слово: ' + esc(v.word).toUpperCase();
     else if (v.done) st = '⏳ Спроби закінчились — чекаємо суперника';
     else st = `Спроба ${v.mine.g.length + 1}/${v.max} · ${v.lang === 'ru' ? 'російською' : 'українською'}, ${L} літер`;
-    const oppInfo = `<div class="wopp"><div class="wm">${oppRows}</div><div style="align-self:center">${esc(opp())}: ${v.opp.n} спроб${v.oppDone && !over ? ' (все)' : ''}</div></div>`;
+    const oppInfo = `<div class="wopp"><div class="wm">${oppRows}</div><div style="align-self:center">${esc(tf('{0}: {1} спроб', opp(), v.opp.n))}${v.oppDone && !over ? ' ' + tr('(все)') : ''}</div></div>`;
     const reveal = over ? `<div class="big">Слово — <b>${esc(v.word).toUpperCase()}</b></div>` : '';
     return { st, html: `${oppInfo}<div class="wg">${rows.join('')}</div>${reveal}${over || v.done ? '' : `<div class="wkb">${kb}</div>`}` };
   };

@@ -95,7 +95,7 @@ function showRules() {
 function leave() { localStorage.removeItem('room'); send({type:'leave'}); S = null; render(); }
 function share() {
   const url = location.origin + '/?r=' + S.code;
-  if (navigator.share) navigator.share({title:'Грати зі мною', text:'Заходь у гру, код ' + S.code, url}).catch(() => {});
+  if (navigator.share) navigator.share({title: tr('Грати зі мною'), text: tf('Заходь у гру, код {0}', S.code), url}).catch(() => {});
   else navigator.clipboard.writeText(url).then(() => toast('Посилання скопійовано'));
 }
 function addPun() { const el = $('#np'); const v = (el.value || '').trim(); if (!v) return; el.value = ''; setS({puns:[...S.puns, v]}); }
@@ -115,7 +115,7 @@ function drawWheel(cv, items, rot) {
     x.beginPath(); x.moveTo(0, 0); x.arc(0, 0, R - 4, i * s - Math.PI / 2, (i + 1) * s - Math.PI / 2); x.closePath();
     x.fillStyle = `hsl(${i * 360 / n},65%,48%)`; x.fill(); x.strokeStyle = '#fff6'; x.lineWidth = 2; x.stroke();
     x.save(); x.rotate((i + .5) * s - Math.PI / 2); x.textAlign = 'right'; x.fillStyle = '#fff'; x.font = 'bold 17px system-ui,sans-serif';
-    x.fillText(t.length > 17 ? t.slice(0, 16) + '…' : t, R - 16, 6); x.restore();
+    t = tr(t); x.fillText(t.length > 17 ? t.slice(0, 16) + '…' : t, R - 16, 6); x.restore();
   });
   x.restore();
 }
