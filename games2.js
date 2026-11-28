@@ -254,3 +254,4 @@ const bj = {
 };
 
 module.exports = { chk, hang, quiz, math, anag, dice, bj };
+Object.defineProperty(module.exports, '_QB', { value: QB });   // для адмінки (не ігровий ключ)

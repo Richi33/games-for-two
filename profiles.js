@@ -6,7 +6,8 @@ const ach = require('./achievements');
 const skills = require('./skills');
 
 const PID_RE = /^[a-f0-9]{32}$/;
-const REWARD = { w: { stars: 10, xp: 30 }, d: { stars: 5, xp: 15 }, l: { stars: 3, xp: 10 } };
+const REWARD_BASE = { w: { stars: 10, xp: 30 }, d: { stars: 5, xp: 15 }, l: { stars: 3, xp: 10 } };
+const REWARD = JSON.parse(JSON.stringify(REWARD_BASE));   // можна змінити з адмінки: setRewards()
 const BOT_STARS_CAP = 40;          // зірок на добу, які можна заробити проти бота
 const MIN_GAME_MS = 10000;         // дуже короткі партії нагород не дають
 const TITLES = [[1, 'Новачок'], [3, 'Гравець'], [5, 'Знавець'], [8, 'Майстер'], [12, 'Легенда'], [20, 'Міфічний']];
@@ -109,6 +110,7 @@ async function bump(pid, field) {
 
 async function buy(pid, id) {
   const p = await load(pid, false), s = skills.byId(id); if (!p || !s) return { ok: false, msg: 'Невідомий скіл' };
+  if (s.off) return { ok: false, msg: 'Скіл тимчасово недоступний' };
   p.inv = p.inv || {};
   if ((p.inv[id] || 0) >= skills.MAX_OWN) return { ok: false, msg: 'Більше ' + skills.MAX_OWN + ' штук не потрібно' };
   if (p.stars < s.price) return { ok: false, msg: 'Не вистачає ⭐' };
@@ -124,7 +126,13 @@ const peek = pid => { const p = cache.get(keyOf(pid || '')); return p || null; }
 function setName(pid, name) { const k = keyOf(pid), p = cache.get(k); if (p && name && p.name !== name) { p.name = name.slice(0, 20); saveLater(pid, 1000); } }
 function flushAll() { for (const [k, t] of timers) { clearTimeout(t); } timers.clear(); if (store.flush) store.flush(); }
 
+function setRewards(o) {
+  for (const k of ['w', 'd', 'l']) { const x = (o && o[k]) || {}, b = REWARD_BASE[k]; REWARD[k].stars = Number.isInteger(x.stars) && x.stars >= 0 && x.stars <= 1000 ? x.stars : b.stars; REWARD[k].xp = Number.isInteger(x.xp) && x.xp >= 0 && x.xp <= 5000 ? x.xp : b.xp; }
+}
+const kv = { get: k => store.get(k), set: (k, v) => store.set(k, v) };   // загальне сховище (для налаштувань адмінки)
+
 module.exports = {
+  setRewards, getRewards: () => JSON.parse(JSON.stringify(REWARD)), baseRewards: () => JSON.parse(JSON.stringify(REWARD_BASE)), kv,
   PID_RE, load, exists, view, buy, useItem, peek, daily, award, awardMarathon, bump, setName, flushAll, levelOf, titleOf, xpAt,
   _setStore(s) { store = s; cache.clear(); chains.clear(); }, _store: () => store, _day: day,
 };

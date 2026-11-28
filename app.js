@@ -191,7 +191,7 @@ function home() {
 const gname = id => { const g = GAMES.find(x => x.id === id); return g ? g.e + ' ' + g.n : id; };
 window.marToggle = id => { const p = [...(S.marPick || [])], i = p.indexOf(id); if (i >= 0) p.splice(i, 1); else if (p.length < 6) p.push(id); setS({marathon: p}); };
 function marathonHtml() {
-  const pick = S.marPick || [], avail = GAMES.filter(g => !S.bot || (S.botGames || []).includes(g.id));
+  const pick = S.marPick || [], avail = GAMES.filter(g => !(S.off || []).includes(g.id) && (!S.bot || (S.botGames || []).includes(g.id)));
   return `<h3>🏁 Марафон</h3><div class="card"><div class="muted">Оберіть 2–6 ігор по порядку: їх зіграєте поспіль із загальним рахунком. Колесо покарань (якщо ввімкнене) крутиться наприкінці для загального програвшого. Налаштування гри (складність, мова…) діють на весь марафон.</div>
   <div class="chips">${avail.map(g => { const i = pick.indexOf(g.id); return `<button class="chip ${i >= 0 ? 'on' : ''}" onclick="marToggle('${g.id}')">${i >= 0 ? (i + 1) + '. ' : ''}${g.e} ${esc(g.n)}</button>`; }).join('')}</div>
   ${pick.length ? `<div class="muted">${pick.length < 2 ? 'Оберіть ще хоча б одну гру' : 'Порядок: ' + pick.map(gname).join(' → ')}</div><button class="ghost" onclick="setS({marathon:[]})">Очистити вибір</button>` : ''}</div>`;
@@ -229,7 +229,7 @@ function lobby() {
   return `<div class="bar"><b>Кімната</b><span><button class="ghost" onclick="toggleSnd()" aria-label="Звук">${localStorage.snd === '0' ? '🔇' : '🔊'}</button><button class="ghost" onclick="leave()">Вийти ✕</button></span></div>
   <div class="card"><div class="muted" style="text-align:center">Код кімнати</div><div class="code">${S.code}</div>
   <button class="primary" style="margin:0 0 10px" onclick="share()">🔗 Запросити друга</button>${playersHtml()}${S.bot ? '<button class="ghost" onclick="send({type:\'unbot\'})">👥 Замінити бота живою людиною</button>' : ''}${seriesHtml(true)}</div>
-  <h3>Гра</h3><div class="games">${GAMES.map(g => `<button class="gbtn ${g.id === S.game ? 'on' : ''}" onclick="setS({game:'${g.id}'})"><b>${g.e} ${g.n}</b><span>${g.d}</span></button>`).join('')}</div>
+  <h3>Гра</h3><div class="games">${GAMES.filter(g => !(S.off || []).includes(g.id)).map(g => `<button class="gbtn ${g.id === S.game ? 'on' : ''}" onclick="setS({game:'${g.id}'})"><b>${g.e} ${g.n}</b><span>${g.d}</span></button>`).join('')}</div>
   ${window.extraSettings ? extraSettings() : ''}
   ${marathonHtml()}
   <h3>Покарання</h3><div class="card">
@@ -238,7 +238,7 @@ function lobby() {
    ${S.puns.length >= 2 ? '<div class="wheelbox"><canvas id="wheel" width="640" height="640"></canvas></div>' : ''}
    ${S.puns.map((p, i) => `<div class="pun"><span>${esc(p)}</span><button onclick="delPun(${i})">✕</button></div>`).join('')}
    <div class="row" style="margin-top:8px"><input id="np" type="text" maxlength="60" placeholder="Нове покарання…" onkeydown="if(event.key==='Enter')addPun()"><button onclick="addPun()">＋</button></div>
-   <button class="ghost" onclick="setS({puns:DEFAULT_PUNS})">Скинути до стандартних</button>` : ''}</div>
+   <button class="ghost" onclick="setS({puns:S.defPuns||DEFAULT_PUNS})">Скинути до стандартних</button>` : ''}</div>
   <button class="primary" ${ready && !noBot ? '' : 'disabled'} onclick="send({type:'start'})">${!ready ? 'Чекаємо другого гравця…' : noBot ? '🤖 Бот ще не вміє цю гру' : mara ? `🏁 Почати марафон (${S.marPick.length} ігор)` : '▶ Почати гру'}</button>`;
 }
 function wheelScreen() {

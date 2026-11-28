@@ -7,6 +7,7 @@ const content = require('./content');
 const content2 = require('./content2');
 const bots = require('./bots');
 const profiles = require('./profiles');
+const admin = require('./admin');
 const achievements = require('./achievements');
 const skills = require('./skills');
 
@@ -27,6 +28,8 @@ const STATIC = {
   '/extra7.js': ['extra7.js', 'text/javascript'],
   '/extra8.js': ['extra8.js', 'text/javascript'],
   '/i18n.js': ['i18n.js', 'text/javascript'],
+  '/admin': ['admin.html', 'text/html; charset=utf-8'],
+  '/admin_ui.js': ['admin_ui.js', 'text/javascript'],
   '/lang_en.js': ['lang_en.js', 'text/javascript'],
   '/lang_ru.js': ['lang_ru.js', 'text/javascript'],
   '/extra9.js': ['extra9.js', 'text/javascript'],
@@ -38,7 +41,14 @@ const STATIC = {
   '/favicon.svg': ['favicon.svg', 'image/svg+xml'],
   '/offline.html': ['offline.html', 'text/html; charset=utf-8'],
 };
-const server = http.createServer((req, res) => {
+const adminCtx = {
+  games: () => admin.GAME_LIST.filter(g => Object.prototype.hasOwnProperty.call(games, g.id)),
+  stats: () => ({ rooms: rooms.size, players: [...rooms.values()].reduce((n, r) => n + r.players.filter(p => p && !p.bot && p.ws && p.ws.readyState === 1).length, 0) }),
+  onGamesChanged: () => rooms.forEach(r => { if (r.phase === 'lobby' && admin.gameOff(r.game)) r.game = firstGame(); broadcast(r); }),
+};
+const firstGame = () => (adminCtx.games().find(g => !admin.gameOff(g.id)) || { id: 'ttt' }).id;
+const server = http.createServer(async (req, res) => {
+  if (req.url.startsWith('/api/admin/') && await admin.handle(req, res, adminCtx)) return;
   if (req.url === '/healthz') { res.writeHead(200, { 'Content-Type': 'text/plain' }); return res.end('ok'); }
   const hit = STATIC[req.url.split('?')[0]];
   if (!hit) { res.writeHead(404); return res.end('404'); }
@@ -49,7 +59,7 @@ const server = http.createServer((req, res) => {
   });
 });
 
-const DEFAULT_PUNS = ['10 присідань', 'Заспівати уривок пісні', 'Розповісти жарт', 'Зробити комплімент переможцю', 'Танцювати 30 секунд', 'Масаж плечей 1 хвилину', 'Розповісти секрет', 'Принести переможцю напій'];
+const DEFAULT_PUNS = content.DEFAULT_PUNS;
 const rooms = new Map();
 const REACTS = ['😂', '👏', '😡', '😮', '❤️', '🔥', '👍', '😭'];
 const rnd = n => (Math.random() * n) | 0;
@@ -69,7 +79,7 @@ function snapshot(r, i) {
     type: 'room', code: r.code, you: i,
     names: r.players.map(p => p && p.name), online: r.players.map(isOn), bot: !!r.bot, botGames: r.bot ? bots.SUPPORTED : undefined, mar: r.mar, marPick: r.marPick,
     game: r.game, diff: r.diff, deck: r.deck, perevod: r.perevod, lang: r.lang, len: r.len, daily: r.daily, mode: r.mode, topic: r.topic, pack: r.pack, packs: r.phase === 'lobby' ? content2.PACK_LIST : undefined, custom: r.custom, topics: r.phase === 'lobby' ? content.topicsFor(r.mode) : undefined, withPun: r.withPun, puns: r.puns, phase: r.phase, wheel: r.wheel, punishment: r.punishment,
-    winner: r.state ? r.state.winner : null, series: r.series, sk: skSnap(r),
+    winner: r.state ? r.state.winner : null, series: r.series, sk: skSnap(r), off: admin.offList(), defPuns: r.phase === 'lobby' ? content.DEFAULT_PUNS : undefined,
     view: playing ? games[r.game].view(r.state, i) : null,
   };
 }
@@ -123,7 +133,7 @@ function armSkills(r) {                                         // фіксує 
 function useSkill(r, i, id, ws) {
   if (!r.sk || !r.sk[i]) return;
   const s = r.sk[i], def = skills.byId(id), pid = r.players[i] && r.players[i].pid;
-  if (!def || !pid || !s.ids.includes(id) || s.used.includes(id)) return;
+  if (!def || def.off || !pid || !s.ids.includes(id) || s.used.includes(id)) return;
   if (def.when !== r.phase) return send(ws, { type: 'toast', msg: def.when === 'wheel' ? 'Цей скіл діє лише поки крутиться колесо' : 'Цей скіл діє лише під час гри' });
   if (id === 'respin' && (r.mar || !r.withPun || r.puns.length < 2)) return;
   s.used.push(id);                                              // резервуємо одразу, щоб не спрацював двічі
@@ -191,6 +201,7 @@ function startGame(r, ws) {
   if (r.withPun && r.puns.length < 2) return send(ws, { type: 'error', msg: 'Додайте щонайменше 2 покарання' });
   const mara = r.phase === 'lobby' && r.marPick.length >= 2;
   const list = mara ? r.marPick : [r.game];
+  if (list.some(admin.gameOff)) return send(ws, { type: 'error', msg: 'Цю гру вимкнено адміністратором' });
   if (r.bot && list.some(g => !bots.SUPPORTED.includes(g))) return send(ws, { type: 'error', msg: '🤖 Бот ще не вміє цю гру' });
   clearTimers(r); armSkills(r);
   if (mara) {                                                  // марафон: колеса перед іграми немає
@@ -251,7 +262,7 @@ function handle(ws, m) {
   }
   if (m.type === 'create') {
     const code = newCode();
-    const r = { code, players: [null, null], game: 'ttt', diff: 'normal', deck: '36', perevod: true, lang: 'uk', len: 5, daily: false, pack: 'mix', custom: emptyCustom(), mode: 'normal', topic: 'mix', withPun: false, puns: [...DEFAULT_PUNS], phase: 'lobby', state: null, wheel: null, punishment: null, timers: new Set(), series: newSeries(), chat: [], bot: false, marPick: [], mar: null, skVote: [false, false], skLoad: [[], []], sk: null };
+    const r = { code, players: [null, null], game: firstGame(), diff: 'normal', deck: '36', perevod: true, lang: 'uk', len: 5, daily: false, pack: 'mix', custom: emptyCustom(), mode: 'normal', topic: 'mix', withPun: false, puns: [...DEFAULT_PUNS], phase: 'lobby', state: null, wheel: null, punishment: null, timers: new Set(), series: newSeries(), chat: [], bot: false, marPick: [], mar: null, skVote: [false, false], skLoad: [[], []], sk: null };
     rooms.set(code, r);
     ws.room = r; ws.idx = 0; ws.token = String(m.token || '');
     r.players[0] = { ws, name: String(m.name || 'Гравець').slice(0, 20), token: ws.token, pid: ws.pid };
@@ -279,12 +290,12 @@ function handle(ws, m) {
   switch (m.type) {
     case 'settings':
       if (r.phase !== 'lobby') return;
-      if (typeof m.game === 'string' && Object.prototype.hasOwnProperty.call(games, m.game)) r.game = m.game;
+      if (typeof m.game === 'string' && Object.prototype.hasOwnProperty.call(games, m.game) && !admin.gameOff(m.game)) r.game = m.game;
       if (['easy', 'normal', 'hard'].includes(m.diff)) r.diff = m.diff;
       if (m.lang === 'uk' || m.lang === 'ru') r.lang = m.lang;
       if (Number.isInteger(m.len) && m.len >= 5 && m.len <= 8) r.len = m.len;
       if (Array.isArray(m.marathon)) {
-        const ok = g => typeof g === 'string' && Object.prototype.hasOwnProperty.call(games, g) && (!r.bot || bots.SUPPORTED.includes(g));
+        const ok = g => typeof g === 'string' && Object.prototype.hasOwnProperty.call(games, g) && !admin.gameOff(g) && (!r.bot || bots.SUPPORTED.includes(g));
         r.marPick = [...new Set(m.marathon.filter(ok))].slice(0, 6);
       }
       if (typeof m.daily === 'boolean') r.daily = m.daily;
@@ -302,7 +313,7 @@ function handle(ws, m) {
       r.skVote[i] = m.on === true; return broadcast(r);
     case 'skload': {
       if (r.phase !== 'lobby' || !Array.isArray(m.ids)) return;
-      r.skLoad[i] = [...new Set(m.ids.filter(id => skills.byId(id)))].slice(0, skills.SLOTS); return broadcast(r);
+      r.skLoad[i] = [...new Set(m.ids.filter(id => skills.byId(id) && !skills.byId(id).off))].slice(0, skills.SLOTS); return broadcast(r);
     }
     case 'skill': return useSkill(r, i, String(m.id || ''), ws);
     case 'start':
@@ -372,5 +383,5 @@ wss.on('connection', ws => {
 });
 setInterval(() => wss.clients.forEach(ws => { if (!ws.isAlive) return ws.terminate(); ws.isAlive = false; ws.ping(); }), 25000);
 
-server.listen(PORT, () => console.log('Games for two on http://localhost:' + PORT));
+admin.load().then(() => server.listen(PORT, () => console.log('Games for two on http://localhost:' + PORT)));
 process.on('SIGTERM', () => { try { profiles.flushAll(); } catch (e) {} process.exit(0); });
