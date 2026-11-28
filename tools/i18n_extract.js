@@ -52,7 +52,7 @@ function walk(node, src, f, parent) {
     if (Array.isArray(v)) v.forEach(c => c && c.type && walk(c, src, f, node)); else if (v && typeof v.type === 'string') walk(v, src, f, node);
   }
 }
-const files = fs.readdirSync(ROOT).filter(x => /\.(js|html)$/.test(x) && !/^(sw\.js|i18n\.js|lang_.*\.js)$/.test(x));
+const files = fs.readdirSync(ROOT).filter(x => /\.(js|html)$/.test(x) && !/^(sw\.js|i18n\.js|admin\.js|admin_ui\.js|admin\.html|lang_.*\.js)$/.test(x));
 for (const fn of files) {
   const src = fs.readFileSync(path.join(ROOT, fn), 'utf8');
   if (fn.endsWith('.html')) {

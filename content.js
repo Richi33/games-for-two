@@ -123,4 +123,7 @@ const wyrPool = (mode, topic) => {
   return one ? [one] : list;
 };
 
-module.exports = { topicsFor, wyrPool, KNOW: { normal: KNOW_NORMAL, adult: KNOW_ADULT }, TOD };
+// Покарання колеса за замовчуванням (редагуються в адмінці; масив змінюється «на місці»)
+const DEFAULT_PUNS = ['10 присідань', 'Заспівати уривок пісні', 'Розповісти жарт', 'Зробити комплімент переможцю', 'Танцювати 30 секунд', 'Масаж плечей 1 хвилину', 'Розповісти секрет', 'Принести переможцю напій'];
+
+module.exports = { topicsFor, wyrPool, KNOW: { normal: KNOW_NORMAL, adult: KNOW_ADULT }, TOD, DEFAULT_PUNS, WYR: { normal: WYR_NORMAL, adult: WYR_ADULT } };

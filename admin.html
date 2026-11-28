@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="uk"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex"><title>Адмінка · Ігри на двох</title>
+<style>
+:root{--bg:#f2f3fa;--card:#fff;--tx:#1b1d2a;--mu:#6b7090;--ac:#6c5ce7;--bd:#dfe2f2;--ok:#1f9d63;--bad:#d64545;--warn:#c98a00}
+@media(prefers-color-scheme:dark){:root{--bg:#161827;--card:#222540;--tx:#eef0ff;--mu:#9aa0c3;--bd:#33375a}}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--tx);font:15px/1.4 system-ui,sans-serif}
+main{max-width:860px;margin:0 auto;padding:14px 14px 60px}h1{font-size:20px;margin:6px 0 12px}h3{margin:18px 0 8px}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:14px;padding:12px;margin:10px 0}
+button,select,input,textarea{font:inherit;color:var(--tx)}
+button{background:var(--ac);color:#fff;border:0;border-radius:10px;padding:8px 14px;cursor:pointer}button.g{background:transparent;color:var(--tx);border:1px solid var(--bd)}button.r{background:var(--bad)}button.s{padding:5px 10px;font-size:13px}button:disabled{opacity:.5}
+input,select,textarea{width:100%;background:var(--bg);border:1px solid var(--bd);border-radius:10px;padding:9px;margin:4px 0}textarea{min-height:64px;resize:vertical}
+.tabs{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0}.tabs button{background:var(--card);color:var(--tx);border:1px solid var(--bd)}.tabs button.on{background:var(--ac);color:#fff}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.row>*{flex:0 0 auto}.grow{flex:1 1 200px!important}
+.item{display:flex;gap:8px;align-items:flex-start;padding:8px 0;border-top:1px solid var(--bd)}.item:first-child{border-top:0}.item .t{flex:1;word-break:break-word}.item.hidden .t{text-decoration:line-through;opacity:.5}
+.badge{font-size:11px;padding:2px 7px;border-radius:9px;border:1px solid var(--bd);color:var(--mu);white-space:nowrap}.badge.added{color:var(--ok);border-color:var(--ok)}.badge.edited{color:var(--warn);border-color:var(--warn)}.badge.hidden{color:var(--bad);border-color:var(--bad)}
+.mu{color:var(--mu);font-size:13px}.err{color:var(--bad);margin:6px 0}.ok{color:var(--ok)}
+.sw{flex-wrap:wrap;display:flex;justify-content:space-between;align-items:center;gap:8px;padding:8px 0;border-top:1px solid var(--bd)}.sw:first-child{border-top:0}
+.num{width:90px}
+#toast{position:fixed;left:50%;bottom:18px;transform:translateX(-50%);background:#222;color:#fff;padding:9px 16px;border-radius:12px;display:none;z-index:9}
+</style></head><body><main id="m"></main><div id="toast"></div><script src="/admin_ui.js"></script></body></html>
